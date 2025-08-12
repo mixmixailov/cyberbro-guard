@@ -61,6 +61,7 @@ docker run --rm -p 8000:8000 --env-file .env cyberbro-guard
    - `BOT_TOKEN=<ваш_токен>`
    - `DEBUG=false`
    - (опционально) `PUBLIC_BASE=https://<your-service>.railway.app`
+   - В проде сервис слушает порт из переменной `PORT`, задаётся платформой автоматически.
 4) Если `PUBLIC_BASE` не задан, установите вебхук вручную с помощью скрипта (локально):
 ```bash
 BOT_TOKEN=<token> PUBLIC_BASE=https://<your-service>.railway.app python scripts/manage_webhook.py set
