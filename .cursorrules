@@ -1,0 +1,26 @@
+# Project: CyberBro Guard (Telegram admin bot, FastAPI webhook, SQLite, Docker, Railway)
+# Goals: чистая модульная архитектура, минимальные зависимости, продакшен-готовность.
+
+[architecture]
+- Python 3.11+, python-telegram-bot v20+, FastAPI, uvicorn.
+- Структура: app/{main.py, bot.py, config.py, handlers/*, services/*, utils/*, data/}
+- Никаких глобалей: состояние через Application.bot_data и DI в функции.
+- Хранилище: SQLite (миграции позже), безопасные транзакции.
+
+[coding-style]
+- PEP8, типизация typing, краткие docstrings.
+- Логирование через logging, уровни: INFO/ERROR, без print.
+- i18n через utils.lang T[lang]; клавиатуры — фабрики; callback_data — паттерны.
+
+[testing]
+- После генерации кода — добавляй простые self-check инструкции (как запустить, что должно отобразиться в логах/ответе).
+
+[security]
+- Никаких секретов в коде. Читаем из env через Pydantic/BaseSettings.
+- Не добавлять тяжёлые/рандомные либы без необходимости.
+
+[deliverables]
+- Маленькие диффы. Каждый шаг: обновлённые файлы + команды запуска.
+- В README — чёткие шаги: локально, Docker, Railway.
+
+

@@ -1,0 +1,23 @@
+.env
+__pycache__/
+*.pyc
+.git/
+.venv/
+env/
+venv/
+*.db
+*.sqlite3
+*.log
+*.json
+.idea/
+.vscode/
+.env
+__pycache__/
+*.pyc
+.venv/ env/ venv/
+*.db *.sqlite3
+*.log
+data/*.json
+.git
+.idea
+.vscode
