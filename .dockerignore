@@ -9,6 +9,8 @@ venv/
 *.sqlite3
 *.log
 *.json
+!samples/update_message.json
+!start.sh
 .idea/
 .vscode/
 .env
