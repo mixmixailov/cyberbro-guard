@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from .session import execute, fetchone
@@ -46,6 +46,19 @@ def create_payment(
         """,
         (tg_id, amount_cents, currency, provider, status, _now_iso(), raw_json),
     )
+
+
+def upgrade_user_to_pro(tg_id: int, days: int = 30) -> None:
+    """Set user's plan to PRO and extend until by given days from now."""
+    until_iso = (datetime.utcnow() + timedelta(days=days)).isoformat(timespec="seconds")
+    # Ensure user exists first
+    ensure_user(tg_id)
+    execute(
+        "UPDATE users SET plan = 'pro', until = ? WHERE tg_id = ?",
+        (until_iso, tg_id),
+    )
+
+
 
 
 

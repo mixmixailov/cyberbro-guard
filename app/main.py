@@ -95,6 +95,27 @@ async def telegram_webhook(request: Request):
         update = Update.de_json(data, application.bot)
         await application.update_queue.put(update)
         logger.info("Update queued: keys=%s", list(data.keys()))
+        # Extended diagnostics only when DEBUG enabled
+        settings = get_settings()
+        if settings.DEBUG:
+            try:
+                upd_type = (
+                    "message" if "message" in data else (
+                        "callback_query" if "callback_query" in data else "other"
+                    )
+                )
+                uid = (
+                    (data.get("message") or {}).get("from", {}).get("id")
+                    or (data.get("callback_query") or {}).get("from", {}).get("id")
+                )
+                text = None
+                if update.message and update.message.text:
+                    text = update.message.text
+                elif update.callback_query and update.callback_query.data:
+                    text = update.callback_query.data
+                logger.debug("Webhook detail: type=%s uid=%s text=%s", upd_type, uid, text)
+            except Exception:  # noqa: BLE001
+                pass
         return {"ok": True}
     except Exception as exc:  # noqa: BLE001 - логируем всё, сервер не падает
         logger.error("/webhook processing error: %s", exc)
@@ -107,25 +128,18 @@ async def status():
     if settings.DEBUG:
         logger.debug("/status called")
     if not settings.BOT_TOKEN:
-        return JSONResponse({"webhook": None, "running": False}, status_code=503)
+        return JSONResponse({"running": False, "public_base": bool(settings.PUBLIC_BASE), "debug": settings.DEBUG}, status_code=503)
     global application
-    bot_username = None
-    webhook_url = None
     try:
         if application is not None:
             info = await application.bot.get_webhook_info()
             webhook_url = info.url if info else None
-            me = await application.bot.get_me()
-            bot_username = me.username
-        return JSONResponse({
-            "webhook": webhook_url,
-            "running": application is not None,
-            "public_base": bool(settings.PUBLIC_BASE),
-            "debug": settings.DEBUG,
-        })
+        else:
+            webhook_url = None
+        return JSONResponse({"running": application is not None, "public_base": bool(settings.PUBLIC_BASE), "debug": settings.DEBUG})
     except Exception as exc:  # noqa: BLE001
         logger.error("/status error: %s", exc)
-        return JSONResponse({"webhook": None, "running": False, "public_base": bool(settings.PUBLIC_BASE), "debug": settings.DEBUG}, status_code=503)
+        return JSONResponse({"running": False, "public_base": bool(settings.PUBLIC_BASE), "debug": settings.DEBUG}, status_code=503)
 
 
 @app.get("/db_health")
