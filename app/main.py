@@ -27,7 +27,7 @@ async def lifespan(app: FastAPI):
     if tz := os.environ.get("TZ"):
         os.environ["TZ"] = tz
 
-    logger.info("Starting PTB application...")
+    logger.info("Service starting...")
     # Init DB (DDL only, no migrations yet) — sync, run in thread
     await asyncio.to_thread(init_db)
     # Log env file resolution and critical env values
@@ -36,30 +36,32 @@ async def lifespan(app: FastAPI):
                 bool(settings.PUBLIC_BASE),
                 settings.DEBUG)
     if not settings.BOT_TOKEN:
-        logger.error("BOT_TOKEN пуст. Остановлен запуск приложения. Проверь файл .env")
-        raise RuntimeError("BOT_TOKEN пуст. Укажи его в .env")
+        logger.error("BOT_TOKEN пуст. HTTP-сервер стартует, но бот не активен. Укажи BOT_TOKEN в переменных окружения.")
+        application = None
+    else:
+        application = (
+            Application.builder()
+            .token(settings.BOT_TOKEN)
+            .updater(None)
+            .build()
+        )
+        await application.initialize()
+        setup_handlers(application)
+        # Настраиваем вебхук, если указан публичный URL: проверяем текущий и выставляем при необходимости
+        if settings.PUBLIC_BASE:
+            desired_url = settings.PUBLIC_BASE.rstrip("/") + "/webhook"
+            info = await application.bot.get_webhook_info()
+            if info and info.url == desired_url:
+                logger.info("Webhook already set: %s", info.url)
+            else:
+                await application.bot.set_webhook(
+                    url=desired_url, drop_pending_updates=True
+                )
+                logger.info("Webhook set to %s", desired_url)
+        await application.start()
+        logger.info("PTB Application started")
 
-    application = (
-        Application.builder()
-        .token(settings.BOT_TOKEN)
-        .updater(None)
-        .build()
-    )
-    await application.initialize()
-    setup_handlers(application)
-    # Настраиваем вебхук, если указан публичный URL: проверяем текущий и выставляем при необходимости
-    if settings.PUBLIC_BASE:
-        desired_url = settings.PUBLIC_BASE.rstrip("/") + "/webhook"
-        info = await application.bot.get_webhook_info()
-        if info and info.url == desired_url:
-            logger.info("Webhook already set: %s", info.url)
-        else:
-            await application.bot.set_webhook(
-                url=desired_url, drop_pending_updates=True
-            )
-            logger.info("Webhook set to %s", desired_url)
-    await application.start()
-    logger.info("PTB Application started")
+    logger.info("Service ready.")
 
     try:
         yield
