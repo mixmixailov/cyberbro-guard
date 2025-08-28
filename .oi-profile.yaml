@@ -1,0 +1,6 @@
+﻿version: 2
+model: gpt-4-turbo
+temperature: 0.2
+max_output_tokens: 500
+auto_run: false
+verbose: false

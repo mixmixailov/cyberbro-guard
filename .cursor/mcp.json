@@ -1,0 +1,36 @@
+{
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": [
+        "mcp-server-context7@latest"
+      ],
+      "env": {
+        "CONTEXT7_API_KEY": ""
+      },
+      "disabled": true,
+      "alwaysAllow": [
+        "resolve-library-id",
+        "get-library-docs"
+      ]
+    },
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "mcp-server-playwright@latest"
+      ],
+      "env": {
+        "PLAYWRIGHT_BROWSER": "chromium"
+      },
+      "disabled": true,
+      "alwaysAllow": [
+        "browser_navigate",
+        "browser_snapshot", 
+        "browser_click",
+        "browser_type",
+        "browser_evaluate",
+        "browser_take_screenshot"
+      ]
+    }
+  }
+}

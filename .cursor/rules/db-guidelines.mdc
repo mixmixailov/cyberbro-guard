@@ -1,0 +1,12 @@
+---
+description: Database schema and migration rules
+globs:
+  - db/**/*.py
+  - app/db/**/*.py
+rule_type: auto-attached
+---
+
+- Используем SQLite через SQLAlchemy (или SQLite + SQL scripts) в `db/`.
+- Все таблицы описаны в `db/models.py`, миграции через Alembic (если нужны) в `db/migrations/`.
+- Ленивая инициализация базы: подключаться через `get_db()` зависимости.
+

@@ -1,0 +1,10 @@
+---
+rule_type: always
+---
+
+- Всегда используем стек: Python 3.11+, FastAPI, python-telegram-bot (или aiogram), SQLite как единственная БД.
+- Токены, ключи, секреты — только через `os.getenv()`; `.env` не читать.
+- Все файлы: `.env`, `data/`, `__pycache__/` игнорируем (см. `.gitignore`).
+- Код должен быть modular — `handlers/`, `services/`, `db/`, `tests/`.
+- Коммиты: короткие, стандартных типов (feat:, fix:, chore:).
+

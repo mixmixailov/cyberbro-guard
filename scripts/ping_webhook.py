@@ -30,7 +30,11 @@ def main() -> None:
 
     public_base = os.environ.get("PUBLIC_BASE", "http://127.0.0.1:8000")
     url = public_base.rstrip("/") + "/webhook"
-    resp = requests.post(url, json=data, timeout=10)
+    headers = {}
+    secret = os.environ.get("WEBHOOK_SECRET")
+    if secret:
+        headers["X-Telegram-Bot-Api-Secret-Token"] = secret
+    resp = requests.post(url, json=data, headers=headers, timeout=10)
     print(resp.status_code)
     print(resp.text)
 

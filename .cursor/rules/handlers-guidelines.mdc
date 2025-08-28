@@ -1,0 +1,13 @@
+---
+description: Guidelines for handler files
+globs:
+  - handlers/**/*.py
+  - app/handlers/**/*.py
+rule_type: auto-attached
+---
+
+- Каждый handler файл (например, `handlers/antispam.py`) должен содержать:
+  1. функцию `register_handlers(dispatcher)` — для регистрации команд.
+  2. тест в `tests/test_<feature>.py` с симуляцией Telegram Update.
+- Хендлеры должны логировать действия (ban, mute) через `services/logging`.
+

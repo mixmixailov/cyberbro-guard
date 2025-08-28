@@ -1,0 +1,14 @@
+# Constraints for optional/problematic packages on Python 3.13
+# Example: tiktoken wheels may lag behind new Python versions
+# Install only when feature is enabled, and pin here to a compatible build.
+# tiktoken==0.7.0 ; python_version < '3.13'
+
+
+
+
+
+
+
+
+
+

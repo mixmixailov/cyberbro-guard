@@ -1,0 +1,38 @@
+version: "3.9"
+
+services:
+  bot:
+    build: .
+    container_name: cyberbro-bot
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/readyz"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cyberbro-cloudflared
+    command: tunnel --url http://bot:8080 --no-autoupdate
+    depends_on:
+      - bot
+    profiles: ["tunnel"]
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: cyberbro-ngrok
+    command: http --log=stdout bot:8080
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    depends_on:
+      - bot
+    profiles: ["tunnel_ngrok"]
+
+
+
