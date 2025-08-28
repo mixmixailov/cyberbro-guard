@@ -1,0 +1,60 @@
+[33mcommit 16f847321b267f6dd3d669e54a01a6b147657223[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mfeature/ci-test[m[33m)[m
+Author: Mikhail Mikhailov <mixmixxxailov@gmail.com>
+Date:   Wed Aug 27 22:19:27 2025 -0800
+
+    feat: implement comprehensive bug reproduction test system
+    
+    - Create organized unit test structure by application areas:
+      * tests/unit/{handlers,services,db,payments,queue,i18n,ci}/
+      * Template tests with minimal failing cases for each area
+      * Proper __init__.py files for Python package structure
+    
+    - Add pytest markers for bug tracking and area classification:
+      * @pytest.mark.bug - identifies bug reproduction tests
+      * @pytest.mark.issue_id('123') - links to GitHub issues
+      * Area markers: handlers, services, db, payments, queue, i18n, ci
+      * Updated pyproject.toml with strict marker enforcement
+    
+    - Create E2E bug reproduction framework:
+      * tests/e2e/*-bug-repro.spec.ts templates
+      * Playwright integration with @bug and @issue_id:123 annotations
+      * User workflow reproduction for UI/API bugs
+    
+    - Build automated test generation system:
+      * scripts/create_repro_test.py - CLI tool for generating tests
+      * Supports both unit and E2E test creation from issue ID
+      * Template-based generation with proper structure and markers
+      * Area-specific test scaffolding and documentation
+    
+    - Integrate into CI pipeline (.github/workflows/ci.yml):
+      * Separate bug reproduction test execution with continue-on-error
+      * Unit bug tests run with pytest -m 'bug' (expected to fail)
+      * E2E bug tests detected by @bug annotation in test names
+      * Test results uploaded as artifacts for analysis and tracking
+      * Both unit and E2E bug repro results preserved separately
+    
+    - Comprehensive documentation (docs/bug-reproduction-tests.md):
+      * Complete workflow from test creation to maintenance
+      * Templates and examples for different bug types
+      * CI integration details and debugging guidelines
+      * Best practices for reporters, developers, and reviewers
+      * Metrics tracking and maintenance procedures
+    
+    This system ensures every confirmed bug gets a reproduction test,
+    preventing regressions and aiding in development workflow.
+
+.github/workflows/ci.yml
+docs/bug-reproduction-tests.md
+pyproject.toml
+scripts/create_repro_test.py
+tests/e2e/example-bug-repro.spec.ts
+tests/unit/__init__.py
+tests/unit/ci/__init__.py
+tests/unit/db/__init__.py
+tests/unit/handlers/__init__.py
+tests/unit/handlers/test_example_repro.py
+tests/unit/i18n/__init__.py
+tests/unit/payments/__init__.py
+tests/unit/queue/__init__.py
+tests/unit/services/__init__.py
+tests/unit/services/test_example_repro.py

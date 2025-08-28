@@ -205,7 +205,7 @@ def main():
     print("\\n📝 Next steps:")
     print(f"1. Update the generated test(s) with actual bug reproduction logic")
     print(f"2. Ensure tests FAIL until the bug is fixed")
-    print(f"3. Run tests: pytest -m 'bug and issue_id:{issue_id}'")
+    print(f"3. Run tests: pytest -m 'bug' -k 'issue_id_{issue_id}'")
     if args.e2e:
         print(f"4. Run E2E test: npm test -- tests/e2e/{slug}.spec.ts")
 
