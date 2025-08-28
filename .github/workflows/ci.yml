@@ -48,6 +48,9 @@ jobs:
           mypy app --ignore-missing-imports
         continue-on-error: true
 
+      - name: Create reports directory
+        run: mkdir -p reports
+        
       - name: Test with pytest
         run: |
           pytest tests/ -v \
@@ -64,6 +67,7 @@ jobs:
 
       - name: Run bug reproduction tests
         run: |
+          mkdir -p reports
           pytest -m "bug" tests/unit/ -v \
             --junitxml=reports/bug-repro-${{ matrix.python-version }}.xml
         env:
@@ -138,6 +142,7 @@ jobs:
 
       - name: Run E2E tests
         run: |
+          mkdir -p reports
           pytest tests/e2e/ -v \
             --junitxml=reports/e2e-results.xml \
             --html=reports/e2e-report.html \
@@ -198,13 +203,14 @@ jobs:
           output: 'trivy-results.sarif'
 
       - name: Upload Trivy scan results
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
           sarif_file: 'trivy-results.sarif'
 
       - name: Run Bandit security linter
         run: |
+          mkdir -p reports
           pip install bandit[toml]
           bandit -r app/ -f json -o reports/bandit-results.json || true
           bandit -r app/ -f txt || true
