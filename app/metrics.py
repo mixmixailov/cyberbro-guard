@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter
-from prometheus_client import Counter, Histogram, REGISTRY, generate_latest
+from prometheus_client import Counter, Histogram, Gauge, REGISTRY, generate_latest
 from starlette_exporter import PrometheusMiddleware, handle_metrics
 import inspect
 import time
@@ -94,6 +94,28 @@ backoff_seconds = Histogram(
     "cyberbro_backoff_seconds",
     "Send queue backoff delay in seconds",
     buckets=(0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, float("inf")),
+    registry=REGISTRY,
+)
+
+# Dead Letter Queue metrics
+dlq_size_gauge = Gauge(
+    "cyberbro_dlq_size",
+    "Current number of items in Dead Letter Queue",
+    labelnames=("type",),
+    registry=REGISTRY,
+)
+
+dlq_in_total = Counter(
+    "cyberbro_dlq_in_total", 
+    "Total items moved to Dead Letter Queue",
+    labelnames=("type", "reason"),
+    registry=REGISTRY,
+)
+
+dlq_replayed_total = Counter(
+    "cyberbro_dlq_replayed_total",
+    "Total items successfully replayed from Dead Letter Queue", 
+    labelnames=("type",),
     registry=REGISTRY,
 )
 

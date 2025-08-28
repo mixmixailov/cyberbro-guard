@@ -11,6 +11,7 @@ from .basic import register as register_basic
 from .group import register as register_group
 from .payments import register as register_payments
 from .settings import register as register_settings
+from .admin import register_admin_handlers
 from app.services.moderation import ModerationService
 
 
@@ -38,6 +39,7 @@ def setup_handlers(app: Application) -> None:
     register_group(app)
     register_payments(app)
     register_settings(app)
+    register_admin_handlers(app)
     # Support command in basic module
     from .basic import support_cmd
     app.add_handler(CommandHandler("support", support_cmd))

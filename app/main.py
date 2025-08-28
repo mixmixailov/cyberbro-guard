@@ -28,6 +28,7 @@ from .sched.ratelimit_cleanup import run_cleanup_job
 from .utils.scheduler import Scheduler
 from .services.subscriptions import run_reminders, expire_due, cleanup_old_data
 from .services.send_queue import SendQueue
+from .services.dlq import add_failed_update_to_dlq
 from .sched.idempotency_purge import run_purge_job
 
 logger = logging.getLogger(__name__)
@@ -147,24 +148,69 @@ async def lifespan(app: FastAPI):
             update_queue = asyncio.Queue(maxsize=1000)
             async def _worker() -> None:
                 assert application is not None
+                max_attempts = 3  # Max retry attempts before moving to DLQ
+                
                 while True:
                     upd = await update_queue.get()
-                    try:
-                        # Correlate ids for logs
+                    attempt_count = 0
+                    last_error = None
+                    
+                    # Retry loop with DLQ fallback
+                    while attempt_count < max_attempts:
+                        attempt_count += 1
                         try:
-                            set_update_context(
-                                upd.update_id,
-                                getattr(upd.effective_chat, "id", None),
-                                getattr(upd.effective_user, "id", None),
-                            )
-                        except Exception:
-                            pass
-                        tmo = float(get_settings().WEBHOOK_HANDLE_TIMEOUT_S)
-                        try:
+                            # Correlate ids for logs
+                            try:
+                                set_update_context(
+                                    upd.update_id,
+                                    getattr(upd.effective_chat, "id", None),
+                                    getattr(upd.effective_user, "id", None),
+                                )
+                            except Exception:
+                                pass
+                            tmo = float(get_settings().WEBHOOK_HANDLE_TIMEOUT_S)
                             async with asyncio.timeout(tmo):
                                 await application.process_update(upd)
+                            # Success - break out of retry loop
+                            break
+                            
                         except Exception as exc:  # noqa: BLE001
-                            logger.error("update process error: %s", exc, exc_info=True)
+                            last_error = exc
+                            logger.warning(
+                                "Update processing failed (attempt %d/%d): %s", 
+                                attempt_count, max_attempts, exc,
+                                extra={
+                                    "update_id": getattr(upd, "update_id", None),
+                                    "attempt": attempt_count,
+                                    "max_attempts": max_attempts
+                                }
+                            )
+                            
+                            # If this was the last attempt, move to DLQ
+                            if attempt_count >= max_attempts:
+                                try:
+                                    update_data = upd.to_dict() if hasattr(upd, "to_dict") else {"update": str(upd)}
+                                    dlq_id = add_failed_update_to_dlq(
+                                        update_data=update_data,
+                                        error=last_error,
+                                        attempts=attempt_count
+                                    )
+                                    logger.error(
+                                        "Update moved to DLQ after %d failed attempts",
+                                        max_attempts,
+                                        extra={
+                                            "dlq_id": dlq_id,
+                                            "update_id": getattr(upd, "update_id", None),
+                                            "error": str(last_error)
+                                        }
+                                    )
+                                except Exception as dlq_error:  # noqa: BLE001
+                                    logger.error("Failed to add update to DLQ: %s", dlq_error)
+                            else:
+                                # Wait before retry (simple exponential backoff)
+                                wait_time = 2 ** (attempt_count - 1)  # 1s, 2s, 4s...
+                                await asyncio.sleep(wait_time)
+                    
                     finally:
                         update_queue.task_done()
             worker_task = asyncio.create_task(_worker())
