@@ -170,8 +170,8 @@ pytest -m "bug"
 # Run bug tests for specific area
 pytest -m "bug and handlers"
 
-# Run tests for specific issue  
-pytest -k "issue_id" -m "issue_id"
+# Run tests for specific issue
+pytest -m "issue_id:123"
 
 # Run E2E bug reproduction tests
 npm test -- --grep "@bug"
