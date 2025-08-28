@@ -17,7 +17,16 @@ markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "e2e: marks tests as end-to-end integration tests", 
     "unit: marks tests as unit tests",
-    "asyncio: marks tests as async"
+    "asyncio: marks tests as async",
+    "bug: marks tests that reproduce specific bugs",
+    "issue_id: marks tests with GitHub issue ID for tracking",
+    "handlers: marks tests for Telegram handlers area",
+    "services: marks tests for business logic services area",
+    "db: marks tests for database layer area", 
+    "payments: marks tests for payment system area",
+    "queue: marks tests for queue/DLQ system area",
+    "i18n: marks tests for internationalization area",
+    "ci: marks tests for CI/CD pipeline area"
 ]
 
 [tool.coverage.run]
