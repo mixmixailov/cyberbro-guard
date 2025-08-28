@@ -7,6 +7,10 @@ from app.utils.logging import install_json_logging
 
 def setup_logging(debug: bool = False) -> None:
     install_json_logging(debug=debug)
+    
+    # Setup area-specific logging based on DEBUG_TRACE
+    from app.utils.observability import setup_area_logging
+    setup_area_logging()
 
     # Ensure FastAPI/uvicorn access logs don't overwhelm output when not debugging
     if not debug:

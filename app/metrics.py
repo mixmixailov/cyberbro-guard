@@ -4,7 +4,7 @@ import inspect
 import time
 
 from fastapi import APIRouter
-from prometheus_client import REGISTRY, Counter, Gauge, Histogram
+from prometheus_client import REGISTRY, Counter, Gauge, Histogram, generate_latest
 from starlette_exporter import PrometheusMiddleware, handle_metrics
 
 router = APIRouter()
@@ -191,6 +191,23 @@ webhook_errors_total = Counter(
     "cyberbro_webhook_errors_total",
     "Webhook processing errors",
     labelnames=("stage",),
+    registry=REGISTRY,
+)
+
+# Exception tracking by area
+exceptions_total = Counter(
+    "cyberbro_exceptions_total",
+    "Total exceptions by area and type",
+    labelnames=("area", "exception_type"),
+    registry=REGISTRY,
+)
+
+# Handler latency (enhanced from existing webhook_latency_seconds)
+handler_latency_seconds = Histogram(
+    "cyberbro_handler_latency_seconds",
+    "Handler processing latency in seconds",
+    labelnames=("area", "handler"),
+    buckets=(0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0),
     registry=REGISTRY,
 )
 

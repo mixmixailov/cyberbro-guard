@@ -68,6 +68,131 @@ flowchart TD
   - If reproducible: remove `needs:repro`, add `needs:fix`
   - If not reproducible: add `cannot-reproduce`, request more info
 
+## 🧠 3 Hypotheses Framework
+
+When investigating bugs, developers should form **exactly 3 testable hypotheses** before diving into code. This structured approach prevents tunnel vision and ensures systematic investigation.
+
+### Hypothesis Formation Checklist
+
+#### Pre-Investigation
+- [ ] Read the bug report completely
+- [ ] Identify the **expected** vs **actual** behavior
+- [ ] Note the **environment** (OS, browser, deployment, etc.)
+- [ ] Check for **recent changes** in the affected area
+- [ ] Review **similar past issues** for patterns
+
+#### Hypothesis Categories
+
+Form one hypothesis from each category:
+
+**🔄 Process Hypothesis** - Something in the workflow/logic
+- [ ] State machine in wrong state?
+- [ ] Missing validation step?
+- [ ] Race condition between operations?
+- [ ] Incorrect sequencing of events?
+
+**💾 Data Hypothesis** - Something with data/storage
+- [ ] Database constraint violation?
+- [ ] Stale cache/session data?
+- [ ] Data migration issue?
+- [ ] Concurrent modification conflict?
+
+**🌐 Environment Hypothesis** - Something external/contextual
+- [ ] Network timeout or connectivity?
+- [ ] Resource exhaustion (memory, disk, connections)?
+- [ ] Third-party service degradation?
+- [ ] Configuration difference between environments?
+
+### Testing Hypotheses
+
+For each hypothesis, create:
+
+#### Test Plan Template
+```
+Hypothesis: [Brief description]
+Category: [Process/Data/Environment]
+Test Steps:
+1. [Specific step to verify/disprove]
+2. [Expected outcome if hypothesis is correct]
+3. [Expected outcome if hypothesis is wrong]
+
+Evidence Collection:
+- [ ] Add diagnostic logging with issue_id
+- [ ] Capture relevant metrics/traces
+- [ ] Document environmental factors
+```
+
+#### Example Hypothesis Set
+
+**Bug Report**: "Payment fails with 'already processed' error but user was never charged"
+
+**H1 (Process)**: Payment service returns success but webhook delivery fails, causing state mismatch
+```
+Test: Check webhook delivery logs for failed/retried deliveries
+Evidence: webhook_delivery_status, payment_state_transitions
+```
+
+**H2 (Data)**: Idempotency key collision between different payment attempts  
+```
+Test: Query idempotency store for key conflicts around timeframe
+Evidence: idempotency_key_usage, collision_timestamps
+```
+
+**H3 (Environment)**: Database connection timeout during transaction commit
+```
+Test: Check connection pool metrics and transaction duration logs
+Evidence: db_connection_pool_size, transaction_duration_ms
+```
+
+### Diagnostic Code Integration
+
+Use the diagnostic toolkit to trace hypothesis testing:
+
+```python
+from app.utils.diag import trace_section, timer, set_issue_id, set_hypothesis_id
+
+# Set context for bug investigation
+set_issue_id("bug-12345")
+
+# Test each hypothesis systematically
+for hypothesis_id in ["h1-webhook-failure", "h2-key-collision", "h3-db-timeout"]:
+    set_hypothesis_id(hypothesis_id)
+    
+    with trace_section(f"test_{hypothesis_id}"):
+        with timer("evidence_collection"):
+            # Collect evidence for this hypothesis
+            ...
+```
+
+### Hypothesis Outcomes
+
+After testing all 3 hypotheses:
+
+#### ✅ One Confirmed
+- [ ] **Document** the root cause clearly
+- [ ] **Fix** with targeted solution
+- [ ] **Test** that fix resolves the issue
+- [ ] **Verify** other hypotheses were indeed wrong
+
+#### ❌ All Disproven  
+- [ ] **Expand** the hypothesis space - were categories too narrow?
+- [ ] **Re-examine** the bug report - was something missed?
+- [ ] **Escalate** for additional investigation resources
+- [ ] **Consider** this might be multiple bugs
+
+#### 🔀 Multiple Confirmed
+- [ ] **Prioritize** by impact/likelihood
+- [ ] **Address** primary cause first
+- [ ] **Verify** secondary causes are still relevant after primary fix
+- [ ] **Create** separate issues for unrelated causes
+
+### Success Metrics
+
+Track hypothesis framework effectiveness:
+- **Time to Resolution**: Should decrease as developers get systematic
+- **Fix Accuracy**: Fewer regressions and incomplete fixes
+- **Investigation Quality**: Less back-and-forth, more focused debugging
+
 ### 4. Investigation & Fix Stage
 - **Label**: `needs:fix`
 - **Actions**:

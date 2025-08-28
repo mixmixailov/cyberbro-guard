@@ -102,6 +102,9 @@ class Settings(BaseSettings):
     # Database backup configuration
     BACKUP_RETENTION: int = 7  # Keep last N backup files
 
+    # Observability and debugging
+    DEBUG_TRACE: str = ""  # Comma-separated areas to enable DEBUG logging: "handlers,services,payments"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

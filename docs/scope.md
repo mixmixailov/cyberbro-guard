@@ -1,278 +1,244 @@
-# CI Pipeline Scope Document
+# 🎯 Project Scope
 
-## Project Context
+This document defines the scope, requirements, and boundaries for CyberBro Guard project.
 
-**Project**: CyberBro Guard  
-**Feature**: Continuous Integration Pipeline v1  
-**Owner**: Development Team  
-**Stakeholders**: Developers, DevOps, QA, Security Team  
+## 🏗️ Project Overview
 
-## Executive Summary
+**CyberBro Guard** is a Telegram admin bot designed to provide comprehensive group management and moderation capabilities with integrated payment processing for premium features.
 
-Данный документ определяет границы и область действия CI pipeline для проекта CyberBro Guard — Telegram бота с FastAPI webhook интеграцией, SQLite базой данных и Telegram Stars платежами.
+### Core Mission
+- **Primary**: Automate Telegram group administration and moderation
+- **Secondary**: Provide premium features through secure payment processing
+- **Tertiary**: Maintain audit trails and operational visibility
 
-## Scope Definition
+## 📋 Feature Scope
 
-### ✅ In Scope
+### ✅ In Scope - Core Features
 
-#### Core CI Functionality
-1. **Automated Code Quality Checks**
-   - Linting с ruff (стиль, синтаксис, потенциальные ошибки)
-   - Code formatting validation с ruff format --check
-   - Type checking с mypy (tolerance к missing imports)
-   - Import sorting и другие code style проверки
+#### 1. Group Moderation
+- **Automated moderation** - Flood detection, spam filtering, content rules
+- **Manual moderation** - Admin commands, user warnings, bans
+- **Captcha systems** - Anti-bot verification for new members
+- **Link policies** - URL filtering and validation
+- **AI moderation** - Optional AI-powered content analysis
 
-2. **Multi-Version Testing Matrix**
-   - Python 3.11 (production target)
-   - Python 3.13 (compatibility verification)
-   - Parallel execution для оптимизации времени
-   - Fail-fast: false для complete результатов
+#### 2. Payment Processing
+- **Telegram Stars** - Native payment processing for premium subscriptions
+- **Subscription management** - User plan activation and renewal
+- **Refund handling** - Automated refund processing and user notification
+- **Payment audit** - Complete transaction logging and reconciliation
+- **Star transactions** - Telegram Star event tracking and correlation
 
-3. **Comprehensive Test Execution**
-   - Unit tests с pytest
-   - Test coverage measurement (XML + HTML reports)
-   - Integration tests для database operations
-   - Mock testing для external APIs (Telegram, OpenAI)
+#### 3. Admin Features
+- **Settings management** - Per-chat configuration and customization
+- **User management** - Member tracking, role assignment, history
+- **Reporting** - Activity summaries, moderation logs, payment reports
+- **Rate limiting** - Anti-abuse protection and resource management
 
-4. **End-to-End Testing**
-   - Docker-based test environment
-   - Playwright automation для webhook testing
-   - Service health checks
-   - Real webhook flow validation (без real Telegram API calls)
+#### 4. Operational Features
+- **Queue management** - Background job processing with retry logic
+- **Dead Letter Queue** - Failed job storage and replay capabilities
+- **Health monitoring** - System status checks and alerting
+- **Metrics collection** - Prometheus metrics for observability
+- **Structured logging** - JSON logs with correlation IDs
 
-5. **Security Scanning**
-   - Dependency vulnerability scanning с Trivy
-   - Python security linting с Bandit
-   - SARIF output для GitHub Security integration
-   - Container image scanning (будущее)
+### ✅ In Scope - Premium Features
 
-6. **Artifact Management**
-   - Test results (JUnit XML) для GitHub UI integration
-   - Coverage reports (HTML + XML) для developers
-   - E2E test outputs (screenshots, videos, logs)
-   - Security scan results для compliance
+#### Pro Subscription Benefits
+- **Extended AI quota** - Higher monthly AI moderation limits
+- **Advanced settings** - Additional customization options
+- **Priority support** - Faster response times for issues
+- **Enhanced features** - Access to beta/experimental capabilities
 
-#### Repository Integration
-1. **Trigger Events**
-   - Push to main branch
-   - Push to release/* branches
-   - Pull requests targeting main/release branches
-   - Manual workflow dispatch (для debugging)
+### ⚠️ Limited Scope - Future Considerations
 
-2. **GitHub Integration**
-   - Status checks для PR blocking
-   - CI badge для README
-   - Artifact download через GitHub UI
-   - Security alerts integration
+#### 1. Multi-Platform Support
+- **Current**: Telegram only
+- **Future**: Discord, Slack integration consideration
+- **Timeline**: Not in current roadmap
 
-3. **Performance Optimization**
-   - pip dependency caching
-   - Docker layer caching где применимо
-   - Parallel job execution
-   - Concurrency control для resource management
+#### 2. Advanced AI Features
+- **Current**: Basic content moderation
+- **Future**: Sentiment analysis, topic classification
+- **Dependencies**: AI service provider capabilities
+
+#### 3. Custom Integrations
+- **Current**: Standard webhook integrations
+- **Future**: Custom API endpoints for third-party services
+- **Requirements**: Customer demand and resource availability
 
 ### ❌ Out of Scope
 
-#### Deployment & Release Management
-- **Automatic deployment** to production environments
-- **Release artifact building** (Docker images, packages)
-- **Environment promotion** (staging → production)
-- **Blue-green deployment** strategies
-- **Rollback mechanisms** и deployment monitoring
+#### 1. Content Hosting
+- **No file storage** - Bot does not store user-uploaded media
+- **No content delivery** - No CDN or media serving capabilities
+- **No backup services** - User data backup is not provided
 
-*Rationale*: CD (Continuous Deployment) будет отдельной фазой с более строгими требованиями к security и approval workflows.
+#### 2. End-User Applications
+- **No client apps** - No mobile/desktop applications
+- **No web dashboards** - Admin interface is Telegram-only
+- **No external portals** - No user-facing websites
 
-#### Infrastructure & Environment Management
-- **Infrastructure as Code** (Terraform, Ansible)
-- **Environment provisioning** (Railway, AWS setup)
-- **Database migrations** в production
-- **Secret management** системы (Vault, etc.)
-- **Monitoring & alerting** setup для production
+#### 3. Enterprise Features
+- **No multi-tenancy** - Single instance per deployment
+- **No SSO integration** - No enterprise authentication
+- **No compliance reporting** - No regulatory compliance features
 
-*Rationale*: Infrastructure concerns требуют отдельной экспертизы и workflow с operations team.
+## 🎯 User Personas
 
-#### Advanced Testing Scenarios
-- **Load testing** и performance benchmarks
-- **Cross-browser E2E testing** (только Chromium в scope)
-- **Mobile app testing** (не применимо к Telegram боту)
-- **Accessibility testing** (не критично для bot interface)
-- **Penetration testing** (manual security review процесс)
+### Primary Users
 
-*Rationale*: Эти типы тестов требуют специализированных инструментов и более длительного времени выполнения.
+#### 1. Group Administrators
+- **Role**: Telegram group owners and admins
+- **Needs**: Automated moderation, member management, activity monitoring
+- **Pain Points**: Manual moderation overhead, spam/bot management
+- **Success Metrics**: Reduced moderation time, improved group quality
 
-#### External Service Integration Testing
-- **Real Telegram API calls** в CI environment
-- **Real OpenAI API calls** для AI moderation
-- **Real payment processing** с Telegram Stars
-- **Third-party webhook testing** с actual external services
+#### 2. Community Managers
+- **Role**: Professional community moderators
+- **Needs**: Advanced features, reporting, premium support
+- **Pain Points**: Limited customization, scaling challenges
+- **Success Metrics**: Effective large-group management, engagement metrics
 
-*Rationale*: Real API calls создают dependencies на external services, rate limits, и требуют credential management.
+### Secondary Users
 
-#### Compliance & Governance
-- **SOC2/ISO compliance** reporting
-- **Audit trail** для regulatory requirements
-- **License compliance** checking (в базовой версии)
-- **GDPR compliance** validation
-- **Financial compliance** для payment processing
+#### 3. Bot Operators
+- **Role**: Technical admins deploying and maintaining the bot
+- **Needs**: Monitoring, diagnostics, operational visibility
+- **Pain Points**: Debugging issues, performance optimization
+- **Success Metrics**: System uptime, operational efficiency
 
-*Rationale*: Compliance requirements требуют legal review и specialized tools.
+## 📊 Success Criteria
 
-## Technical Boundaries
+### Functional Requirements
 
-### Supported Platforms
-- ✅ **GitHub Actions**: Ubuntu latest runners
-- ❌ **Self-hosted runners**: Not in initial scope
-- ❌ **Windows/macOS runners**: Future enhancement
-- ❌ **ARM architecture**: Not required для current deployment
+#### Payment System
+- **✅ Requirement**: Process Telegram Stars payments with 99.9% reliability
+- **✅ Requirement**: Handle refunds within 24 hours
+- **✅ Requirement**: Maintain complete audit trail for all transactions
+- **✅ Requirement**: Prevent duplicate payment processing (idempotency)
 
-### Python Version Support
-- ✅ **Python 3.11**: Primary production target
-- ✅ **Python 3.13**: Compatibility verification
-- ❌ **Python 3.9/3.10**: Legacy support not required
-- ❌ **PyPy**: Alternative implementations не тестируются
+#### Moderation System
+- **✅ Requirement**: Detect and handle flood attacks within 10 seconds
+- **✅ Requirement**: Process AI moderation requests within 5 seconds
+- **✅ Requirement**: Support custom rule configuration per group
+- **✅ Requirement**: Maintain 99.5% uptime for moderation services
 
-### Testing Framework Scope
-- ✅ **pytest**: Primary test framework
-- ✅ **Playwright**: E2E web automation
-- ✅ **coverage.py**: Code coverage measurement
-- ❌ **Selenium**: Более тяжёлая альтернатива Playwright
-- ❌ **Robot Framework**: Keyword-driven testing не требуется
+#### Queue System
+- **✅ Requirement**: Process webhook updates within 100ms P95
+- **✅ Requirement**: Retry failed operations with exponential backoff
+- **✅ Requirement**: Store failed jobs in DLQ for manual replay
+- **✅ Requirement**: Handle 100 concurrent webhook requests
 
-### Security Scanning Tools
-- ✅ **Trivy**: Filesystem vulnerability scanning
-- ✅ **Bandit**: Python security linting
-- ❌ **Snyk**: Commercial alternative (может быть добавлен later)
-- ❌ **SAST tools**: Advanced static analysis (CodeQL в future scope)
+### Non-Functional Requirements
 
-## Resource Constraints
+#### Performance
+- **Response Time**: < 100ms for webhook processing (P95)
+- **Throughput**: 100 requests/second sustained load
+- **Resource Usage**: < 512MB memory, 1 CPU core sustained
+- **Database Size**: < 1GB for typical deployment
 
-### Time Constraints
-- **Maximum pipeline duration**: 15 minutes
-- **Individual job timeout**: 10 minutes each
-- **Artifact retention**: 30 days (tests), 90 days (security)
-- **Cache retention**: 7 days для pip dependencies
+#### Reliability
+- **Uptime**: 99.5% monthly uptime target
+- **Error Rate**: < 0.1% for payment processing
+- **Data Durability**: Zero tolerance for payment data loss
+- **Recovery Time**: < 5 minutes for service restoration
 
-### Storage Constraints
-- **Artifact size limit**: 500MB per workflow run
-- **Log retention**: 90 days (GitHub Actions default)
-- **Cache size limit**: 10GB per repository
-- **Test result files**: < 50MB per test suite
+#### Security
+- **Authentication**: Webhook signature validation required
+- **Data Protection**: PII redaction in logs and monitoring
+- **Access Control**: Admin-only access to sensitive operations
+- **Audit Trail**: Complete logging of all admin actions
 
-### Compute Constraints
-- **Concurrent jobs**: Maximum 20 (GitHub free tier)
-- **Runner resources**: 2-core, 7GB RAM per job
-- **Docker image size**: < 2GB для test environments
-- **Network bandwidth**: Reasonable usage для dependency downloads
+## 🔒 Constraints and Limitations
 
-## Integration Points
+### Technical Constraints
 
-### Upstream Dependencies
-1. **Source Code Repository**
-   - GitHub repository с code changes
-   - Branch protection rules
-   - PR requirements и review process
+#### Platform Dependencies
+- **Telegram Bot API**: Limited by Telegram's rate limits and capabilities
+- **SQLite Database**: Single-writer limitation for high concurrency
+- **Python Runtime**: GIL limitations for CPU-intensive tasks
+- **Memory Constraints**: In-memory queue size limitations
 
-2. **External Package Registries**
-   - PyPI для Python dependencies
-   - Docker Hub для base images
-   - GitHub Container Registry (если потребуется)
+#### Regulatory Constraints
+- **Payment Processing**: Subject to Telegram's payment policies
+- **Data Retention**: Limited by privacy regulations (GDPR, etc.)
+- **Content Moderation**: Subject to platform terms of service
+- **Geographic Restrictions**: Telegram availability by region
 
-3. **Security Databases**
-   - Trivy vulnerability database
-   - GitHub Advisory Database
-   - CVE feeds для security scanning
+### Resource Constraints
 
-### Downstream Consumers
-1. **Development Workflow**
-   - Developers получают feedback через GitHub UI
-   - PR status checks блокируют merge при failures
-   - Coverage reports помогают в code review
+#### Development Resources
+- **Team Size**: Small development team
+- **Time Constraints**: Iterative development with regular releases
+- **Budget Limitations**: Open source project with limited funding
+- **Maintenance Overhead**: Balance between features and stability
 
-2. **Project Management**
-   - CI metrics для sprint planning
-   - Test results для quality assessment
-   - Security reports для risk management
+#### Infrastructure Constraints
+- **Hosting Costs**: Optimize for cost-effective deployment
+- **Scaling Limitations**: Designed for moderate scale deployment
+- **Monitoring Tools**: Use of free/open source monitoring solutions
+- **Backup Solutions**: Simple backup strategies for small deployments
 
-3. **Future CD Pipeline**
-   - Successful CI builds trigger deployment consideration
-   - Artifacts от CI используются в deployment process
-   - Security clearance от CI требуется для production
+## 📅 Delivery Phases
 
-## Success Metrics
+### Phase 1: Core Functionality (✅ Complete)
+- Basic group moderation features
+- Payment processing with Telegram Stars
+- Essential admin commands and settings
+- Webhook handling and queue management
 
-### Quality Metrics
-- **Build success rate**: ≥ 95% для main branch
-- **Test coverage**: ≥ 80% line coverage
-- **Security scan pass rate**: ≥ 98% (с acceptable exceptions)
-- **Type checking coverage**: ≥ 90% файлов без ignore
+### Phase 2: Enhanced Features (🔄 Current)
+- AI moderation integration
+- Advanced queue management (DLQ)
+- Comprehensive monitoring and metrics
+- Regression testing and quality assurance
 
-### Performance Metrics
-- **Average build time**: ≤ 12 minutes
-- **P95 build time**: ≤ 15 minutes
-- **Cache hit rate**: ≥ 80% для pip dependencies
-- **Artifact upload success**: ≥ 99%
+### Phase 3: Operational Excellence (📋 Planned)
+- Production deployment optimizations
+- Enhanced observability and debugging
+- Performance tuning and scaling
+- Documentation and user guides
 
-### Developer Experience Metrics
-- **Time to feedback**: ≤ 5 minutes для basic checks
-- **False positive rate**: ≤ 5% для security scans
-- **Developer satisfaction**: ≥ 8/10 (через survey)
-- **Documentation usage**: ≥ 80% developers read CI docs
+### Phase 4: Premium Features (🔮 Future)
+- Advanced AI capabilities
+- Custom integration options
+- Enhanced reporting and analytics
+- Enterprise-ready features
 
-## Risks and Assumptions
+## 🔄 Change Management
 
-### Key Assumptions
-1. **GitHub Actions availability**: 99.9% uptime SLA
-2. **Python ecosystem stability**: Major packages remain compatible
-3. **Test data isolation**: Tests не влияют друг на друга
-4. **Secret management**: GitHub Secrets достаточно для basic needs
+### Scope Change Process
 
-### Identified Risks
-1. **Dependency conflicts** между Python versions
-2. **Flaky tests** в E2E environment
-3. **Rate limiting** от external services
-4. **Storage costs** для long-term artifact retention
+#### Request Evaluation
+1. **Impact Assessment** - Technical, resource, and timeline impact
+2. **Stakeholder Review** - Get input from key users and maintainers
+3. **Priority Ranking** - Compare against existing roadmap items
+4. **Resource Allocation** - Determine development effort required
 
-### Risk Mitigation Strategies
-1. **Pin critical dependencies** в constraints.txt
-2. **Implement retry logic** для flaky tests
-3. **Mock external services** где возможно
-4. **Automated cleanup** старых artifacts
+#### Approval Criteria
+- **Minor Changes**: Single maintainer approval
+- **Major Features**: Team consensus required
+- **Breaking Changes**: Extended review period and migration plan
+- **Security Changes**: Immediate priority regardless of other factors
 
-## Future Considerations
+### Version Management
 
-### Planned Enhancements (Phase 2)
-- **Performance benchmarking** и regression detection
-- **Multi-platform testing** (Windows, macOS)
-- **Advanced security scanning** (CodeQL, license compliance)
-- **Deployment previews** для PR testing
+#### Semantic Versioning
+- **Major (X.0.0)**: Breaking API changes or major feature additions
+- **Minor (x.Y.0)**: New features, backward compatible
+- **Patch (x.y.Z)**: Bug fixes and security updates
 
-### Integration Opportunities
-- **Slack notifications** для build failures
-- **Jira integration** для automatic ticket creation
-- **Monitoring dashboards** с CI/CD metrics
-- **Automated dependency updates** с Dependabot
+#### Release Process
+- **Development**: Feature branches with PR reviews
+- **Testing**: Automated testing and manual verification
+- **Staging**: Deploy to staging environment for validation
+- **Production**: Gradual rollout with monitoring
 
-### Scalability Considerations
-- **Self-hosted runners** для increased capacity
-- **Distributed testing** для large test suites
-- **Caching strategies** для reduced build times
-- **Resource optimization** для cost management
+## 📚 Related Documentation
 
-## Approval and Sign-off
-
-| Role | Name | Date | Signature |
-|------|------|------|-----------|
-| Lead Developer | TBD | TBD | TBD |
-| DevOps Engineer | TBD | TBD | TBD |
-| Security Representative | TBD | TBD | TBD |
-| Project Manager | TBD | TBD | TBD |
-
----
-
-*Document Version*: 1.0  
-*Last Updated*: January 2025  
-*Review Schedule*: Quarterly или при major changes  
-*Next Review Date*: April 2025
-
-
-
+- [Technical Specifications](spec.md) - Detailed technical requirements
+- [Architecture Overview](architecture.md) - System design and components
+- [API Documentation](../api/) - Webhook and callback API details
+- [Deployment Guide](../deployment/) - Production deployment instructions
+- [Contributing Guidelines](contributing/) - Development and contribution process
