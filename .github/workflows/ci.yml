@@ -66,7 +66,7 @@ jobs:
         env:
           PYTEST_CURRENT_TEST: "1"
           BOT_TOKEN: "test_token"
-          WEBHOOK_SECRET: ""
+          WEBHOOK_SECRET: "test_secret"
           DEBUG: "true"
 
       - name: Run bug reproduction tests
@@ -77,7 +77,7 @@ jobs:
         env:
           PYTEST_CURRENT_TEST: "1"
           BOT_TOKEN: "test_token"
-          WEBHOOK_SECRET: ""
+          WEBHOOK_SECRET: "test_secret"
           DEBUG: "true"
         continue-on-error: true  # Bug repro tests are expected to fail
 
@@ -208,7 +208,7 @@ jobs:
 
       - name: Upload Trivy scan results
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: always() && github.event_name != 'pull_request'
         with:
           sarif_file: 'trivy-results.sarif'
 
