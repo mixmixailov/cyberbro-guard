@@ -1,7 +1,6 @@
 import json
 import os
 import sys
-from urllib.parse import urlencode
 
 import requests
 from dotenv import load_dotenv
@@ -54,7 +53,9 @@ def cmd_set(token: str, webhook_url: str | None) -> None:
     info = api_call(token, "getWebhookInfo")
     current_url = ((info or {}).get("result") or {}).get("url")
     if current_url != url:
-        print(f"WARNING: getWebhookInfo.url != expected url\n expected={url}\n actual={current_url}")
+        print(
+            f"WARNING: getWebhookInfo.url != expected url\n expected={url}\n actual={current_url}"
+        )
 
 
 def cmd_get(token: str) -> None:
@@ -96,6 +97,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
-

@@ -2,16 +2,15 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import time
 import random
+import time
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from telegram.error import RetryAfter, TimedOut, NetworkError
+from telegram.error import NetworkError, RetryAfter, TimedOut
 
 from ..config import get_settings
-from ..metrics import retry_total, backoff_seconds
-
+from ..metrics import backoff_seconds, retry_total
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +58,9 @@ class SendQueue:
         await self._q.put(_Item("send_message", chat_id, (text,), kwargs))
 
     async def edit_text(self, chat_id: int, message_id: int, text: str, **kwargs: Any) -> None:
-        await self._q.put(_Item("edit_message_text", chat_id, (text,), {"message_id": message_id, **kwargs}))
+        await self._q.put(
+            _Item("edit_message_text", chat_id, (text,), {"message_id": message_id, **kwargs})
+        )
 
     async def _worker(self) -> None:
         while True:
@@ -67,17 +68,19 @@ class SendQueue:
             try:
                 await self._send(item)
             except Exception as exc:  # noqa: BLE001
-                logger.error("send failure chat=%s method=%s err=%s", item.chat_id, item.method, exc)
+                logger.error(
+                    "send failure chat=%s method=%s err=%s", item.chat_id, item.method, exc
+                )
             finally:
                 self._q.task_done()
 
     def _calculate_jittered_backoff(self, attempt: int, base_delay: float | None = None) -> float:
         """Calculate jittered exponential backoff delay using decorrelated jitter.
-        
+
         Args:
             attempt: Current retry attempt (1-based)
             base_delay: Base delay override (for RetryAfter scenarios)
-            
+
         Returns:
             Delay in seconds with jitter applied
         """
@@ -85,11 +88,11 @@ class SendQueue:
             # RetryAfter scenario: use provided delay ±30% jitter
             jitter_range = base_delay * 0.3
             return base_delay + random.uniform(-jitter_range, jitter_range)
-        
+
         # Regular exponential backoff with decorrelated jitter
         base = self._settings.BACKOFF_BASE
         max_delay = self._settings.BACKOFF_MAX
-        
+
         if self._settings.BACKOFF_JITTER == "full":
             # Full jitter: random between 0 and exponential backoff
             exp_backoff = min(base * (2 ** (attempt - 1)), max_delay)
@@ -118,27 +121,29 @@ class SendQueue:
 
         attempt = 0
         max_attempts = 5
-        
+
         while True:
             attempt += 1
             try:
                 if item.method == "send_message":
                     await self._bot.send_message(item.chat_id, *item.args, **item.kwargs)
                 elif item.method == "edit_message_text":
-                    await self._bot.edit_message_text(chat_id=item.chat_id, *item.args, **item.kwargs)
+                    await self._bot.edit_message_text(
+                        chat_id=item.chat_id, *item.args, **item.kwargs
+                    )
                 else:
                     logger.warning("unknown send method: %s", item.method)
-                    
+
                 # Success: update rate limit trackers
                 self._last_by_chat[item.chat_id] = time.monotonic()
                 self._last_global = time.monotonic()
                 return
-                
+
             except RetryAfter as e:  # type: ignore[misc]
                 retry_after = float(getattr(e, "retry_after", 1.0)) or 1.0
                 wait_time = self._calculate_jittered_backoff(attempt, retry_after)
                 wait_ms = int(wait_time * 1000)
-                
+
                 # Metrics and logging
                 retry_total.labels(reason="rate_limit").inc()
                 backoff_seconds.observe(wait_time)
@@ -150,13 +155,13 @@ class SendQueue:
                         "attempt": attempt,
                         "retry_after": retry_after,
                         "wait_ms": wait_ms,
-                        "reason": "rate_limit"
-                    }
+                        "reason": "rate_limit",
+                    },
                 )
-                
+
                 await asyncio.sleep(wait_time)
                 continue
-                
+
             except (TimedOut, NetworkError) as e:
                 if attempt > max_attempts:
                     # Final attempt failed
@@ -169,15 +174,15 @@ class SendQueue:
                             "attempt": attempt,
                             "max_attempts": max_attempts,
                             "reason": "max_attempts_exceeded",
-                            "error": str(e)
-                        }
+                            "error": str(e),
+                        },
                     )
                     raise
-                
+
                 # Calculate backoff for network errors
                 wait_time = self._calculate_jittered_backoff(attempt)
                 wait_ms = int(wait_time * 1000)
-                
+
                 # Metrics and logging
                 retry_total.labels(reason="network_error").inc()
                 backoff_seconds.observe(wait_time)
@@ -189,21 +194,8 @@ class SendQueue:
                         "attempt": attempt,
                         "wait_ms": wait_ms,
                         "reason": "network_error",
-                        "error": str(e)
-                    }
+                        "error": str(e),
+                    },
                 )
-                
+
                 await asyncio.sleep(wait_time)
-
-
-
-
-
-
-
-
-
-
-
-
-

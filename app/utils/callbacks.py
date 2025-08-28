@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from enum import Enum
-import time
-import hmac
 import hashlib
-from typing import Tuple, List
+import hmac
+import time
+from enum import Enum
+from typing import List, Tuple
 
 from app.config import get_settings
 
@@ -93,14 +93,12 @@ def build_settings_info() -> str:
 
 
 def build_settings_open() -> str:
-    return build_v1([CBPrefix.SETTINGS, "open"]) 
+    return build_v1([CBPrefix.SETTINGS, "open"])
 
 
 def build_settings_help() -> str:
-    return build_v1([CBPrefix.SETTINGS, "help"]) 
+    return build_v1([CBPrefix.SETTINGS, "help"])
 
 
 def build_settings_buy() -> str:
-    return build_v1([CBPrefix.SETTINGS, "buy"]) 
-
-
+    return build_v1([CBPrefix.SETTINGS, "buy"])

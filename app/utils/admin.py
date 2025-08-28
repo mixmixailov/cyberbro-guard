@@ -39,50 +39,14 @@ def is_admin_request(update: Update) -> bool:
 
 def admin_only(func):
     """Decorator to restrict access to admin users only."""
+
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not is_admin_request(update):
             if update.message:
-                await update.message.reply_text("❌ This command is only available to administrators.")
+                await update.message.reply_text(
+                    "❌ This command is only available to administrators."
+                )
             return
         return await func(update, context)
+
     return wrapper
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

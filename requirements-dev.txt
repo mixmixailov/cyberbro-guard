@@ -4,7 +4,7 @@ mypy==1.10.0
 pytest==8.2.0
 pytest-cov==6.0.0
 pytest-html==4.1.1
-pytest-xdist==3.6.0
+pytest-xdist==3.5.0
 pytest-asyncio==0.23.8
 playwright==1.49.1
 bandit[toml]==1.8.0

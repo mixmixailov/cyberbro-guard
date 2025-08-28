@@ -12,7 +12,6 @@ from fastapi.responses import JSONResponse
 from .config import get_settings
 from .db.session import execute as db_execute
 
-
 router = APIRouter()
 
 _started_at = time.time()
@@ -79,5 +78,3 @@ async def privacy() -> dict[str, Any]:
             "policy": "Aggregated moderation; conservative fallback; soft monthly quotas per chat.",
         },
     }
-
-

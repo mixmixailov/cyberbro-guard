@@ -5,7 +5,9 @@ from typing import Any
 from telegram.ext import ContextTypes
 
 
-async def send_text(context: ContextTypes.DEFAULT_TYPE, chat_id: int, text: str, **kwargs: Any) -> None:
+async def send_text(
+    context: ContextTypes.DEFAULT_TYPE, chat_id: int, text: str, **kwargs: Any
+) -> None:
     sq = None
     try:
         if context and context.application:
@@ -16,20 +18,3 @@ async def send_text(context: ContextTypes.DEFAULT_TYPE, chat_id: int, text: str,
         await sq.send_text(chat_id, text, **kwargs)
     else:
         await context.bot.send_message(chat_id, text, **kwargs)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

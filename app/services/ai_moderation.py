@@ -9,7 +9,6 @@ import requests
 
 from app.config import get_settings
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -60,7 +59,9 @@ class OpenAIModerationProvider(ModerationProvider):
             # Fail-open or fail-closed per config
             fail_open = bool(get_settings().AI_MODERATION_FAIL_OPEN)
             logger.error("ai_moderation error: %s", exc)
-            return ModerationResult(allowed=fail_open, action="allow" if fail_open else "block", reason="error")
+            return ModerationResult(
+                allowed=fail_open, action="allow" if fail_open else "block", reason="error"
+            )
 
 
 def get_provider() -> ModerationProvider | None:
@@ -70,8 +71,3 @@ def get_provider() -> ModerationProvider | None:
     if s.AI_MODERATION_PROVIDER.lower() == "openai" and s.OPENAI_API_KEY:
         return OpenAIModerationProvider(s.OPENAI_API_KEY)
     return None
-
-
-
-
-

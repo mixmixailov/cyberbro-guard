@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from fastapi import APIRouter
-from prometheus_client import Counter, Histogram, Gauge, REGISTRY, generate_latest
-from starlette_exporter import PrometheusMiddleware, handle_metrics
 import inspect
 import time
 
+from fastapi import APIRouter
+from prometheus_client import REGISTRY, Counter, Gauge, Histogram, generate_latest
+from starlette_exporter import PrometheusMiddleware, handle_metrics
 
 router = APIRouter()
 
@@ -106,7 +106,7 @@ dlq_size_gauge = Gauge(
 )
 
 dlq_in_total = Counter(
-    "cyberbro_dlq_in_total", 
+    "cyberbro_dlq_in_total",
     "Total items moved to Dead Letter Queue",
     labelnames=("type", "reason"),
     registry=REGISTRY,
@@ -114,7 +114,7 @@ dlq_in_total = Counter(
 
 dlq_replayed_total = Counter(
     "cyberbro_dlq_replayed_total",
-    "Total items successfully replayed from Dead Letter Queue", 
+    "Total items successfully replayed from Dead Letter Queue",
     labelnames=("type",),
     registry=REGISTRY,
 )
@@ -127,7 +127,7 @@ wal_pages = Gauge(
 )
 
 wal_size_bytes = Gauge(
-    "cyberbro_wal_size_bytes", 
+    "cyberbro_wal_size_bytes",
     "Current WAL file size in bytes",
     registry=REGISTRY,
 )
@@ -151,6 +151,7 @@ checkpoint_duration_seconds = Histogram(
 def timeit(hist: Histogram, label_value: str):  # type: ignore[name-defined]
     def decorator(fn):  # type: ignore[no-untyped-def]
         if inspect.iscoroutinefunction(fn):
+
             async def wrapped(*args, **kwargs):  # type: ignore[no-untyped-def]
                 start = time.perf_counter()
                 try:
@@ -160,8 +161,10 @@ def timeit(hist: Histogram, label_value: str):  # type: ignore[name-defined]
                         hist.labels(label_value).observe(time.perf_counter() - start)
                     except Exception:
                         pass
+
             return wrapped
         else:
+
             def wrapped(*args, **kwargs):  # type: ignore[no-untyped-def]
                 start = time.perf_counter()
                 try:
@@ -171,8 +174,11 @@ def timeit(hist: Histogram, label_value: str):  # type: ignore[name-defined]
                         hist.labels(label_value).observe(time.perf_counter() - start)
                     except Exception:
                         pass
+
             return wrapped
+
     return decorator
+
 
 webhook_dropped_total = Counter(
     "cyberbro_webhook_dropped_total",
@@ -188,6 +194,23 @@ webhook_errors_total = Counter(
     registry=REGISTRY,
 )
 
+# Exception tracking by area
+exceptions_total = Counter(
+    "cyberbro_exceptions_total",
+    "Total exceptions by area and type",
+    labelnames=("area", "exception_type"),
+    registry=REGISTRY,
+)
+
+# Handler latency (enhanced from existing webhook_latency_seconds)
+handler_latency_seconds = Histogram(
+    "cyberbro_handler_latency_seconds",
+    "Handler processing latency in seconds",
+    labelnames=("area", "handler"),
+    buckets=(0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0),
+    registry=REGISTRY,
+)
+
 
 def attach_exporter(app) -> None:  # type: ignore[no-untyped-def]
     # Starlette exporter middleware collects default http_* metrics.
@@ -195,10 +218,6 @@ def attach_exporter(app) -> None:  # type: ignore[no-untyped-def]
     app.add_middleware(PrometheusMiddleware, group_paths=True)
     app.add_route("/metrics", handle_metrics)
 
+
 # Expose registry and generate_latest for tests/utilities
 registry = REGISTRY
-
-
-
-
-

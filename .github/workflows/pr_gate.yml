@@ -1,0 +1,147 @@
+name: PR Gate
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  pr-gate:
+    name: PR Gate Checks
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch full history for accurate diff analysis
+      
+      - name: Get changed files
+        id: changed-files
+        run: |
+          # Get list of changed files
+          git diff --name-only origin/${{ github.base_ref }}..HEAD > changed_files.txt
+          
+          # Count total changed lines (excluding docs/ and tests/)
+          CODE_LINES=0
+          while IFS= read -r file; do
+            # Skip docs/ and tests/ directories
+            if [[ "$file" =~ ^(docs/|tests/) ]]; then
+              echo "Skipping documentation/test file: $file"
+              continue
+            fi
+            
+            # Skip deleted files
+            if [[ ! -f "$file" ]]; then
+              echo "File deleted: $file"
+              continue
+            fi
+            
+            # Count lines changed in this file
+            LINES=$(git diff --numstat origin/${{ github.base_ref }}..HEAD -- "$file" | awk '{print $1 + $2}' || echo "0")
+            if [[ "$LINES" =~ ^[0-9]+$ ]]; then
+              CODE_LINES=$((CODE_LINES + LINES))
+              echo "File: $file, Lines changed: $LINES"
+            fi
+          done < changed_files.txt
+          
+          echo "Total code lines changed: $CODE_LINES"
+          echo "code_lines=$CODE_LINES" >> $GITHUB_OUTPUT
+          
+          # Check for app/ changes
+          APP_CHANGES=$(grep -c '^app/' changed_files.txt || echo "0")
+          echo "app_changes=$APP_CHANGES" >> $GITHUB_OUTPUT
+          
+          # Check for payments/ or queue/ changes
+          PAYMENTS_CHANGES=$(grep -c '^app/.*payments' changed_files.txt || echo "0")
+          QUEUE_CHANGES=$(grep -c '^app/.*queue' changed_files.txt || echo "0")
+          CRITICAL_CHANGES=$((PAYMENTS_CHANGES + QUEUE_CHANGES))
+          echo "critical_changes=$CRITICAL_CHANGES" >> $GITHUB_OUTPUT
+          
+          # Check for test file changes
+          TEST_CHANGES=$(grep -c '^tests/' changed_files.txt || echo "0")
+          echo "test_changes=$TEST_CHANGES" >> $GITHUB_OUTPUT
+          
+          # Check for docs updates
+          SPEC_CHANGES=$(grep -c '^docs/spec\.md$\|^docs/scope\.md$' changed_files.txt || echo "0")
+          echo "spec_changes=$SPEC_CHANGES" >> $GITHUB_OUTPUT
+          
+          # Debug output
+          echo "Files changed in app/: $APP_CHANGES"
+          echo "Files changed in payments/queue: $CRITICAL_CHANGES"
+          echo "Test files changed: $TEST_CHANGES"
+          echo "Spec/scope docs changed: $SPEC_CHANGES"
+      
+      - name: Check PR size limit
+        if: steps.changed-files.outputs.code_lines > 400
+        run: |
+          echo "❌ PR is too large!"
+          echo "Changed lines of code: ${{ steps.changed-files.outputs.code_lines }}"
+          echo "Maximum allowed: 400 lines"
+          echo ""
+          echo "Please split this PR into smaller, more focused changes."
+          echo "Large PRs are harder to review and more likely to contain bugs."
+          echo ""
+          echo "Tips for reducing PR size:"
+          echo "- Split unrelated changes into separate PRs"
+          echo "- Move refactoring to a separate PR"
+          echo "- Extract preparatory changes to prerequisite PRs"
+          echo "- Focus on a single feature or bug fix per PR"
+          exit 1
+      
+      - name: Check test coverage for app/ changes
+        if: steps.changed-files.outputs.app_changes > 0 && steps.changed-files.outputs.test_changes == 0
+        run: |
+          echo "❌ Missing tests for app/ changes!"
+          echo "Changes detected in app/ directory but no test files were modified."
+          echo ""
+          echo "When modifying application code, please ensure:"
+          echo "- Add unit tests for new functions/methods"
+          echo "- Update existing tests if behavior changes"
+          echo "- Add regression tests for bug fixes"
+          echo "- Include integration tests for new features"
+          echo ""
+          echo "Test directories:"
+          echo "- tests/unit/ - Unit tests"
+          echo "- tests/regression/ - Regression tests"
+          echo "- tests/ - Integration tests"
+          exit 1
+      
+      - name: Check documentation for critical changes
+        if: steps.changed-files.outputs.critical_changes > 0 && steps.changed-files.outputs.spec_changes == 0
+        run: |
+          echo "❌ Missing documentation updates!"
+          echo "Changes detected in payments/ or queue/ but docs/spec.md or docs/scope.md were not updated."
+          echo ""
+          echo "Critical system changes require documentation updates:"
+          echo "- docs/spec.md - Technical specifications and API changes"
+          echo "- docs/scope.md - Feature scope and requirements"
+          echo ""
+          echo "Please update relevant documentation to:"
+          echo "- Explain new features or changes"
+          echo "- Update API documentation"
+          echo "- Describe behavior changes"
+          echo "- Include examples if applicable"
+          exit 1
+      
+      - name: PR Gate Summary
+        run: |
+          echo "✅ PR Gate Checks Passed!"
+          echo ""
+          echo "📊 PR Statistics:"
+          echo "- Code lines changed: ${{ steps.changed-files.outputs.code_lines }}/400"
+          echo "- App files changed: ${{ steps.changed-files.outputs.app_changes }}"
+          echo "- Test files changed: ${{ steps.changed-files.outputs.test_changes }}"
+          echo "- Critical files changed: ${{ steps.changed-files.outputs.critical_changes }}"
+          echo "- Docs updated: ${{ steps.changed-files.outputs.spec_changes }}"
+          echo ""
+          if [[ "${{ steps.changed-files.outputs.code_lines }}" -gt 300 ]]; then
+            echo "⚠️  Large PR warning: Consider splitting for easier review"
+          fi
+          
+          if [[ "${{ steps.changed-files.outputs.app_changes }}" -gt 0 && "${{ steps.changed-files.outputs.test_changes }}" -gt 0 ]]; then
+            echo "✅ Good: Code changes include test updates"
+          fi
+          
+          if [[ "${{ steps.changed-files.outputs.critical_changes }}" -gt 0 && "${{ steps.changed-files.outputs.spec_changes }}" -gt 0 ]]; then
+            echo "✅ Good: Critical changes include documentation updates"
+          fi

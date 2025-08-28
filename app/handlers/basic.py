@@ -1,16 +1,19 @@
-from typing import Final
-import logging
-
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import Application, CommandHandler, ContextTypes
 import asyncio
-from app.db import upsert_user_by_tg_id
-from app.db.queries import upgrade_user_to_pro
-from app.utils.lang import t
-from app.config import get_settings
-from app.utils.callbacks import build_settings_open, build_settings_help, build_settings_buy
-from app.utils.sender import send_text
+import logging
+from typing import Final
 
+from telegram import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Update,
+)
+from telegram.ext import Application, CommandHandler, ContextTypes
+
+from app.config import get_settings
+from app.db import upsert_user_by_tg_id
+from app.utils.callbacks import build_settings_buy, build_settings_help, build_settings_open
+from app.utils.lang import t
+from app.utils.sender import send_text
 
 START_TEXT: Final[str] = t("start.welcome")
 logger = logging.getLogger(__name__)
@@ -20,7 +23,9 @@ async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.info("start_cmd from uid=%s", getattr(update.effective_user, "id", None))
     if update.message:
         # choose language by user, fallback to default
-        lang = getattr(update.effective_user, "language_code", None) or get_settings().DEFAULT_LOCALE
+        lang = (
+            getattr(update.effective_user, "language_code", None) or get_settings().DEFAULT_LOCALE
+        )
         if getattr(update.effective_chat, "type", None) == "private":
             ikb = InlineKeyboardMarkup(
                 [
@@ -32,7 +37,12 @@ async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             )
             try:
                 # Use send queue if available
-                await send_text(context, update.effective_chat.id, t("start.welcome", lang=lang), reply_markup=ikb)
+                await send_text(
+                    context,
+                    update.effective_chat.id,
+                    t("start.welcome", lang=lang),
+                    reply_markup=ikb,
+                )
             except Exception as exc:  # noqa: BLE001
                 logger.error("reply_text failed: %s", exc, exc_info=True)
         else:
@@ -78,7 +88,4 @@ async def support_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if update.effective_message:
         await update.effective_message.reply_text(t("support.info", lang=lang))
 
-
     # Note: payments handlers manage invoices and successful_payment
-
-

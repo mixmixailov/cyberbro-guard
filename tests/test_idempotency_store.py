@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import time as _time
-
 from app.services.idempotency import IdempotencyStore, make_key
 
 
@@ -33,6 +31,7 @@ def test_purge_removes_expired(monkeypatch):
 
     class T:
         cur = t0
+
         def time(self):
             return self.cur
 
@@ -49,8 +48,3 @@ def test_purge_removes_expired(monkeypatch):
     fake.cur = t0 + 20
     purged = store.purge_expired(limit=1000)
     assert purged >= 2
-
-
-
-
-

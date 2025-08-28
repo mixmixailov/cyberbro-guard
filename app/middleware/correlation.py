@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import uuid
-from typing import Callable
 
 from starlette.types import ASGIApp, Receive, Scope, Send
 
@@ -18,43 +17,3 @@ class CorrelationMiddleware:
             set_request_id(request_id)
             scope.setdefault("headers", [])
         await self.app(scope, receive, send)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

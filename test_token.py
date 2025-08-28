@@ -1,12 +1,15 @@
 import asyncio
 import logging
+
 from telegram import Bot
 
 from app.config import get_settings
 
 
 async def main():
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    )
     settings = get_settings()
     if not settings.BOT_TOKEN:
         logging.error("BOT_TOKEN is empty. Check your .env or environment variables.")
@@ -19,6 +22,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
-
-

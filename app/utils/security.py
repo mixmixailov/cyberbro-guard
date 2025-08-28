@@ -16,33 +16,3 @@ def verify_secret(header_value: str | None, env_secret: str | None) -> bool:
         return hmac.compare_digest(actual, expected)
     except Exception:
         return False
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

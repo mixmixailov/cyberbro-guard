@@ -1,5 +1,9 @@
 name: CI
 
+permissions:
+  contents: read
+  security-events: write
+
 on:
   push:
     branches: [ main, 'release/*' ]
@@ -48,6 +52,9 @@ jobs:
           mypy app --ignore-missing-imports
         continue-on-error: true
 
+      - name: Create reports directory
+        run: mkdir -p reports
+        
       - name: Test with pytest
         run: |
           pytest tests/ -v \
@@ -59,8 +66,20 @@ jobs:
         env:
           PYTEST_CURRENT_TEST: "1"
           BOT_TOKEN: "test_token"
-          WEBHOOK_SECRET: ""
+          WEBHOOK_SECRET: "test_secret"
           DEBUG: "true"
+
+      - name: Run bug reproduction tests
+        run: |
+          mkdir -p reports
+          pytest -m "bug" tests/unit/ -v \
+            --junitxml=reports/bug-repro-${{ matrix.python-version }}.xml
+        env:
+          PYTEST_CURRENT_TEST: "1"
+          BOT_TOKEN: "test_token"
+          WEBHOOK_SECRET: "test_secret"
+          DEBUG: "true"
+        continue-on-error: true  # Bug repro tests are expected to fail
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
@@ -71,6 +90,7 @@ jobs:
             reports/pytest-${{ matrix.python-version }}.xml
             reports/coverage-${{ matrix.python-version }}.xml
             reports/htmlcov-${{ matrix.python-version }}/
+            reports/bug-repro-${{ matrix.python-version }}.xml
           retention-days: 30
 
       - name: Upload coverage to Codecov
@@ -126,6 +146,7 @@ jobs:
 
       - name: Run E2E tests
         run: |
+          mkdir -p reports
           pytest tests/e2e/ -v \
             --junitxml=reports/e2e-results.xml \
             --html=reports/e2e-report.html \
@@ -133,6 +154,16 @@ jobs:
         env:
           E2E_BASE_URL: "http://localhost:8080"
           PLAYWRIGHT_BROWSERS_PATH: /home/runner/.cache/ms-playwright
+
+      - name: Run E2E bug reproduction tests
+        run: |
+          # Find and run E2E tests marked with @bug in test names
+          find tests/e2e -name "*.spec.ts" -exec grep -l "@bug" {} \; | \
+          xargs -r npx playwright test --reporter=junit --output-dir=reports/e2e-bug-repro/
+        env:
+          E2E_BASE_URL: "http://localhost:8080"
+          PLAYWRIGHT_BROWSERS_PATH: /home/runner/.cache/ms-playwright
+        continue-on-error: true  # E2E bug repro tests are expected to fail
 
       - name: Capture service logs
         if: always()
@@ -154,6 +185,7 @@ jobs:
           path: |
             reports/e2e-results.xml
             reports/e2e-report.html
+            reports/e2e-bug-repro/
             reports/logs/
             test-results/
           retention-days: 30
@@ -175,13 +207,14 @@ jobs:
           output: 'trivy-results.sarif'
 
       - name: Upload Trivy scan results
-        uses: github/codeql-action/upload-sarif@v2
-        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        if: always() && github.event_name != 'pull_request'
         with:
           sarif_file: 'trivy-results.sarif'
 
       - name: Run Bandit security linter
         run: |
+          mkdir -p reports
           pip install bandit[toml]
           bandit -r app/ -f json -o reports/bandit-results.json || true
           bandit -r app/ -f txt || true

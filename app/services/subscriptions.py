@@ -1,18 +1,18 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 from datetime import datetime, timezone
 
 from telegram.ext import Application
 
-from app.db.subscriptions import find_due_reminders, mark_reminder_sent, get_subscription, find_due_expire
-from app.db.subscriptions import get_subscription as db_get_subscription
-from app.db.session import execute
-from app.utils.lang import t
-from app.metrics import sched_runs_total, sched_errors_total
 from app.config import get_settings
-
+from app.db.session import execute
+from app.db.subscriptions import (
+    find_due_reminders,
+    mark_reminder_sent,
+)
+from app.metrics import sched_errors_total, sched_runs_total
+from app.utils.lang import t
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,10 @@ def expire_due() -> None:
     """Expire subscriptions with until <= now()."""
     now_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")
     # Clear users plan where until passed
-    execute("UPDATE users SET plan='free', until=NULL WHERE until IS NOT NULL AND until <= ?", (now_iso,))
+    execute(
+        "UPDATE users SET plan='free', until=NULL WHERE until IS NOT NULL AND until <= ?",
+        (now_iso,),
+    )
     # Optionally add audit log write here later
 
 
@@ -68,8 +71,8 @@ def cleanup_old_data() -> None:
 
     # ai_usage: drop rows older than 120 days (safety)
     try:
-        execute("DELETE FROM ai_usage WHERE period < strftime('%Y-%m', date('now', '-120 days'))", ())
+        execute(
+            "DELETE FROM ai_usage WHERE period < strftime('%Y-%m', date('now', '-120 days'))", ()
+        )
     except Exception:
         pass
-
-

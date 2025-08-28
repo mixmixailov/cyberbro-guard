@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.config import get_settings
+
 from .queries import get_chat_settings, upsert_chat_settings
 
 
@@ -43,14 +44,12 @@ def parse_allowlist_csv(text: str) -> str:
     normalized = []
     for it in items:
         it = it.replace("http://", "").replace("https://", "").replace("www.", "")
-        normalized.append("".join(ch for ch in it if ch.isalnum() or ch in {'.', '-'}))
+        normalized.append("".join(ch for ch in it if ch.isalnum() or ch in {".", "-"}))
     return ",".join(sorted(set(filter(None, normalized))))
 
 
 def set_settings(chat_id: int, values: dict[str, Any]) -> None:
     # Clean allowlist if present
     if "link_allowlist" in values and isinstance(values["link_allowlist"], str):
-        values = {**values, "link_allowlist": parse_allowlist_csv(values["link_allowlist"]) }
+        values = {**values, "link_allowlist": parse_allowlist_csv(values["link_allowlist"])}
     upsert_chat_settings(chat_id, values)
-
-

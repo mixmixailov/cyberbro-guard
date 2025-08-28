@@ -42,8 +42,3 @@ def test_cleanup_removes_idle_entries(monkeypatch):
     t[0] += 60.0
     removed = b.cleanup(max_age=30.0)
     assert removed >= 1
-
-
-
-
-

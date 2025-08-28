@@ -1,11 +1,10 @@
 """Pytest configuration for E2E tests."""
 
+import os
+
 import pytest
 import pytest_asyncio
-import asyncio
-import os
 from playwright.async_api import async_playwright
-
 
 # Event loop configuration handled by pytest-asyncio
 
@@ -21,8 +20,7 @@ async def browser():
     """Create a browser instance for the test session."""
     async with async_playwright() as p:
         browser = await p.chromium.launch(
-            headless=True,
-            args=["--no-sandbox", "--disable-dev-shm-usage"]
+            headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"]
         )
         yield browser
         await browser.close()
@@ -32,8 +30,7 @@ async def browser():
 async def browser_context(browser):
     """Create a browser context for the test session."""
     context = await browser.new_context(
-        viewport={"width": 1920, "height": 1080},
-        ignore_https_errors=True
+        viewport={"width": 1920, "height": 1080}, ignore_https_errors=True
     )
     yield context
     await context.close()
@@ -43,8 +40,7 @@ async def browser_context(browser):
 async def page(browser):
     """Create a new page for each test."""
     context = await browser.new_context(
-        viewport={"width": 1920, "height": 1080},
-        ignore_https_errors=True
+        viewport={"width": 1920, "height": 1080}, ignore_https_errors=True
     )
     page = await context.new_page()
     yield page
@@ -64,16 +60,13 @@ def test_update_payload():
                 "id": 123456789,
                 "is_bot": False,
                 "first_name": "Test",
-                "username": "testuser"
+                "username": "testuser",
             },
             "chat": {
                 "id": 123456789,
                 "type": "private",
                 "first_name": "Test",
-                "username": "testuser"
-            }
-        }
+                "username": "testuser",
+            },
+        },
     }
-
-
-

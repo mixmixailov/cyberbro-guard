@@ -1,5 +1,5 @@
-import types
 import asyncio
+import types
 
 from app.services.payments import send_pro_invoice
 
@@ -37,8 +37,3 @@ def test_send_pro_invoice_retries(monkeypatch):
 
     asyncio.run(run())
     assert update.effective_message.calls == 3
-
-
-
-
-

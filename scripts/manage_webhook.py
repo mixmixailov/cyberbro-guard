@@ -3,8 +3,7 @@ import asyncio
 import json
 import logging
 import os
-import sys
-from typing import Final, Any
+from typing import Any, Final
 
 from telegram import Bot
 
@@ -53,7 +52,9 @@ async def get_info(bot: Bot) -> dict[str, Any]:
     }
 
 
-async def cmd_set(bot: Bot, url: str, secret: str | None, allowed: list[str], drop_pending: bool, dry: bool) -> int:
+async def cmd_set(
+    bot: Bot, url: str, secret: str | None, allowed: list[str], drop_pending: bool, dry: bool
+) -> int:
     current = await get_info(bot)
     same_url = (current.get("url") or "") == url
     same_allowed = sorted(current.get("allowed_updates") or []) == sorted(allowed)
@@ -95,7 +96,9 @@ async def cmd_info(bot: Bot) -> int:
     return 0
 
 
-async def cmd_reset_with_drop(bot: Bot, url: str, secret: str | None, allowed: list[str], dry: bool) -> int:
+async def cmd_reset_with_drop(
+    bot: Bot, url: str, secret: str | None, allowed: list[str], dry: bool
+) -> int:
     if dry:
         print("[dry-run] reset-with-drop")
     await cmd_delete(bot, drop_pending=True, dry=dry)
@@ -108,11 +111,17 @@ def build_argparser() -> argparse.ArgumentParser:
     g.add_argument("--set", action="store_true", help="Set webhook")
     g.add_argument("--delete", action="store_true", help="Delete webhook")
     g.add_argument("--info", action="store_true", help="Get webhook info")
-    g.add_argument("--reset-with-drop", action="store_true", help="Delete then set webhook with drop_pending_updates=true")
+    g.add_argument(
+        "--reset-with-drop",
+        action="store_true",
+        help="Delete then set webhook with drop_pending_updates=true",
+    )
     p.add_argument("--url", type=str, help="Webhook URL (e.g., https://host/webhook)")
     p.add_argument("--secret", type=str, help="Secret token for X-Telegram-Bot-Api-Secret-Token")
     p.add_argument("--allowed", type=str, help="JSON array of allowed_updates")
-    p.add_argument("--drop-pending", action="store_true", help="Drop pending updates when setting webhook")
+    p.add_argument(
+        "--drop-pending", action="store_true", help="Drop pending updates when setting webhook"
+    )
     p.add_argument("--dry", action="store_true", help="Dry-run: print actions without API calls")
     return p
 
@@ -131,7 +140,11 @@ async def main() -> int:
         print("ERROR: allowed_updates resolved to empty list. Set ALLOWED_UPDATES or --allowed.")
         return 2
     # Fallback URL if not provided: PUBLIC_BASE + /webhook
-    url = args.url or (os.environ.get("PUBLIC_BASE", "").rstrip("/") + WEBHOOK_PATH if os.environ.get("PUBLIC_BASE") else None)
+    url = args.url or (
+        os.environ.get("PUBLIC_BASE", "").rstrip("/") + WEBHOOK_PATH
+        if os.environ.get("PUBLIC_BASE")
+        else None
+    )
 
     bot = Bot(token=bot_token)
 
@@ -139,7 +152,14 @@ async def main() -> int:
         if not url:
             print("ERROR: --url or PUBLIC_BASE must be provided for --set")
             return 2
-        return await cmd_set(bot, url, args.secret or os.environ.get("WEBHOOK_SECRET"), allowed, args.drop_pending, args.dry)
+        return await cmd_set(
+            bot,
+            url,
+            args.secret or os.environ.get("WEBHOOK_SECRET"),
+            allowed,
+            args.drop_pending,
+            args.dry,
+        )
     if args.delete:
         return await cmd_delete(bot, args.drop_pending, args.dry)
     if args.info:
@@ -148,15 +168,11 @@ async def main() -> int:
         if not url:
             print("ERROR: --url or PUBLIC_BASE must be provided for --reset-with-drop")
             return 2
-        return await cmd_reset_with_drop(bot, url, args.secret or os.environ.get("WEBHOOK_SECRET"), allowed, args.dry)
+        return await cmd_reset_with_drop(
+            bot, url, args.secret or os.environ.get("WEBHOOK_SECRET"), allowed, args.dry
+        )
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(asyncio.run(main()))
-
-
-
-
-
-

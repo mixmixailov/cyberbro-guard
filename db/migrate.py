@@ -7,7 +7,6 @@ from typing import Iterable
 
 from app.db.session import _get_conn  # reuse sqlite config
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -71,7 +70,9 @@ def apply_migrations(migrations_dir: str) -> int:
 
 
 def main(argv: Iterable[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="SQLite forward-only migrator (PRAGMA user_version)")
+    parser = argparse.ArgumentParser(
+        description="SQLite forward-only migrator (PRAGMA user_version)"
+    )
     parser.add_argument("--dir", default=str(Path(__file__).resolve().parent / "migrations"))
     args = parser.parse_args(args=list(argv) if argv is not None else None)
     logging.basicConfig(level=logging.INFO)
@@ -85,9 +86,3 @@ def main(argv: Iterable[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
-
-
-
-
-

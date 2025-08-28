@@ -3,25 +3,24 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import unicodedata
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Deque, Dict, Tuple, List
+from typing import Deque, Dict, List, Tuple
 from urllib.parse import urlparse
-import unicodedata
 
-from telegram import Update, ChatPermissions, Message, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import ChatPermissions, InlineKeyboardButton, InlineKeyboardMarkup, Message, Update
 from telegram.ext import ContextTypes
 
-from app.db.chat_settings import get_effective_settings
-from app.db.queries import add_warn_and_maybe_ban, upsert_user_state, get_user_state
 from app.db import get_chat
+from app.db.chat_settings import get_effective_settings
+from app.db.queries import add_warn_and_maybe_ban, get_user_state, upsert_user_state
 from app.db.subscriptions import get_subscription  # make available for monkeypatch in tests
-from app.utils.callbacks import build_captcha_answer, parse_callback, CBPrefix
-from app.utils.lang import t
-from app.services.ai_moderation import get_provider, ModerationResult
+from app.services.ai_moderation import ModerationResult, get_provider
 from app.services.ai_moderation_guard import call_with_resilience, record_ai_success
-
+from app.utils.callbacks import CBPrefix, build_captcha_answer, parse_callback
+from app.utils.lang import t
 
 logger = logging.getLogger(__name__)
 
@@ -95,18 +94,23 @@ class ModerationService:
             if is_pro:
                 # Quota check per chat
                 try:
-                    from app.db.queries import ai_get_usage, ai_increment
                     from app.config import get_settings as _gs
+                    from app.db.queries import ai_get_usage, ai_increment
+
                     quota = int(_gs().AI_MONTHLY_QUOTA)
                     used = ai_get_usage(int(chat.id))
                     if used >= quota:
-                        logger.info("ai.quota.exceeded chat=%s used=%s quota=%s", chat.id, used, quota)
+                        logger.info(
+                            "ai.quota.exceeded chat=%s used=%s quota=%s", chat.id, used, quota
+                        )
                         # fall back to classic moderation; no AI call
                         ai_provider = None
                 except Exception:
                     pass
                 start_ai = datetime.now(timezone.utc).timestamp()
-                ok, value = await call_with_resilience(lambda: asyncio.to_thread(ai_provider.moderate, text))
+                ok, value = await call_with_resilience(
+                    lambda: asyncio.to_thread(ai_provider.moderate, text)
+                )
                 if ok and isinstance(value, ModerationResult):
                     try:
                         ai_increment(int(chat.id), 1)
@@ -130,8 +134,13 @@ class ModerationService:
             else:
                 # AI enabled but user is not PRO → skip AI path
                 from app.metrics import ai_skipped_total
+
                 ai_skipped_total.labels("not_pro").inc()
-                logger.info("ai.pro_only uid=%s chat=%s", getattr(update.effective_user, "id", None), getattr(update.effective_chat, "id", None))
+                logger.info(
+                    "ai.pro_only uid=%s chat=%s",
+                    getattr(update.effective_user, "id", None),
+                    getattr(update.effective_chat, "id", None),
+                )
 
         # Moderation must be enabled for chat
         try:
@@ -165,7 +174,9 @@ class ModerationService:
                 try:
                     await msg.delete()
                 except Exception as exc:  # noqa: BLE001
-                    logger.error("delete large media failed chat=%s uid=%s err=%s", chat.id, user.id, exc)
+                    logger.error(
+                        "delete large media failed chat=%s uid=%s err=%s", chat.id, user.id, exc
+                    )
                 try:
                     await context.bot.send_message(chat.id, t("moderation.media_too_large"))
                 except Exception:
@@ -180,7 +191,7 @@ class ModerationService:
         norm = unicodedata.normalize("NFKC", raw_text).strip()
         text = norm.lower()
         # collapse invisible/zero-width
-        text = "".join(ch for ch in text if not unicodedata.category(ch) in {"Cf"})
+        text = "".join(ch for ch in text if unicodedata.category(ch) not in {"Cf"})
         # profanity check (lightweight)
         try:
             words = {w.strip(".,!?:;()[]{}\"'") for w in text.split()}
@@ -197,7 +208,7 @@ class ModerationService:
                 t = getattr(e, "type", "")
                 if t == "url":
                     try:
-                        urls.append((raw_text or "")[e.offset:e.offset + e.length])
+                        urls.append((raw_text or "")[e.offset : e.offset + e.length])
                     except Exception:
                         pass
                 elif t == "text_link":
@@ -209,7 +220,7 @@ class ModerationService:
                 t = getattr(e, "type", "")
                 if t == "url":
                     try:
-                        urls.append((msg.caption or "")[e.offset:e.offset + e.length])
+                        urls.append((msg.caption or "")[e.offset : e.offset + e.length])
                     except Exception:
                         pass
                 elif t == "text_link":
@@ -250,8 +261,17 @@ class ModerationService:
             if len(recent_same) >= repeat_n:
                 await self._warn_and_maybe_ban(update, context, reason="repeat")
 
-    async def _should_block_link(self, context: ContextTypes.DEFAULT_TYPE, msg: Message, s: dict, now: datetime, urls: List[str] | None = None) -> bool:
-        allowlist = {d.strip().lower() for d in (s.get("link_allowlist") or "").split(",") if d.strip()}
+    async def _should_block_link(
+        self,
+        context: ContextTypes.DEFAULT_TYPE,
+        msg: Message,
+        s: dict,
+        now: datetime,
+        urls: List[str] | None = None,
+    ) -> bool:
+        allowlist = {
+            d.strip().lower() for d in (s.get("link_allowlist") or "").split(",") if d.strip()
+        }
         text = (msg.text or msg.caption or "").lower()
         # If any URL domain is in allowlist, allow
         if allowlist:
@@ -287,25 +307,38 @@ class ModerationService:
             return True
         return (now - joined_at) < timedelta(hours=24)
 
-    async def _warn_and_maybe_ban(self, update: Update, context: ContextTypes.DEFAULT_TYPE, reason: str) -> None:
+    async def _warn_and_maybe_ban(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE, reason: str
+    ) -> None:
         msg = update.effective_message
         chat = update.effective_chat
         user = update.effective_user
         if not (msg and chat and user):
             return
         try:
-            new_count, threshold, banned = await asyncio.to_thread(add_warn_and_maybe_ban, int(user.id), int(chat.id))
+            new_count, threshold, banned = await asyncio.to_thread(
+                add_warn_and_maybe_ban, int(user.id), int(chat.id)
+            )
             await msg.reply_text(f"Warn ({reason}). {new_count}/{threshold}")
             if banned:
-                until = datetime.now(timezone.utc) + timedelta(days=int(get_effective_settings(chat.id).get("ban_days", 7)))
+                until = datetime.now(timezone.utc) + timedelta(
+                    days=int(get_effective_settings(chat.id).get("ban_days", 7))
+                )
                 try:
                     await context.bot.ban_chat_member(chat.id, user.id, until_date=until)
                 except Exception as exc:  # noqa: BLE001
                     logger.error("ban failed chat=%s uid=%s err=%s", chat.id, user.id, exc)
         except Exception as exc:  # noqa: BLE001
-            logger.error("warn flow failed chat=%s uid=%s err=%s", getattr(chat, "id", None), getattr(user, "id", None), exc)
+            logger.error(
+                "warn flow failed chat=%s uid=%s err=%s",
+                getattr(chat, "id", None),
+                getattr(user, "id", None),
+                exc,
+            )
 
-    async def on_chat_member_update(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    async def on_chat_member_update(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ) -> None:
         # Welcome + captcha message
         if not update.chat_member:
             return
@@ -343,8 +376,9 @@ class ModerationService:
         cq = update.callback_query
         # Abuse rate limit per user (optionally per chat)
         try:
-            from app.main import callback_bucket
             from app.config import get_settings
+            from app.main import callback_bucket
+
             scope = get_settings().RATE_LIMIT_SCOPE
             uid = int(getattr(update.effective_user, "id", 0) or 0)
             chat_id = int(getattr(update.effective_chat, "id", 0) or 0)
@@ -382,7 +416,9 @@ class ModerationService:
         except Exception:
             pass
 
-    async def _schedule_captcha_timeout(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_id: int) -> None:
+    async def _schedule_captcha_timeout(
+        self, context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_id: int
+    ) -> None:
         ttl = int(get_effective_settings(chat_id).get("captcha_ttl_s", 60))
         await asyncio.sleep(ttl)
         # if not passed (no flag stored) → mute 24h
@@ -391,9 +427,9 @@ class ModerationService:
             until = datetime.now(timezone.utc) + timedelta(hours=24)
             perms = ChatPermissions(can_send_messages=False)
             try:
-                await context.bot.restrict_chat_member(chat_id, user_id, permissions=perms, until_date=until)
+                await context.bot.restrict_chat_member(
+                    chat_id, user_id, permissions=perms, until_date=until
+                )
                 await context.bot.send_message(chat_id, t("captcha.fail"))
             except Exception as exc:  # noqa: BLE001
                 logger.error("captcha mute failed chat=%s uid=%s err=%s", chat_id, user_id, exc)
-
-

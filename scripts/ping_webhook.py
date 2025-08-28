@@ -1,10 +1,8 @@
 import json
 import os
-import sys
 from pathlib import Path
 
 import requests
-
 
 DEFAULT_SAMPLE = {
     "update_id": 999999999,
@@ -23,7 +21,9 @@ def main() -> None:
     sample_path = Path("samples/update_message.json")
     if not sample_path.exists():
         sample_path.parent.mkdir(parents=True, exist_ok=True)
-        sample_path.write_text(json.dumps(DEFAULT_SAMPLE, ensure_ascii=False, indent=2), encoding="utf-8")
+        sample_path.write_text(
+            json.dumps(DEFAULT_SAMPLE, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
         print(f"Created sample: {sample_path}")
 
     data = json.loads(sample_path.read_text(encoding="utf-8"))
@@ -41,5 +41,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
