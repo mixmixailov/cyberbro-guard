@@ -1,0 +1,65 @@
+# CyberBro Guard Code Owners
+# This file defines who owns which parts of the codebase
+# for automatic review requests on PRs and bug triage
+
+# Global fallback
+* @mixmixailov
+
+# Core application areas
+/app/ @mixmixailov
+
+# Handlers - Telegram message/callback processing  
+/app/handlers/ @mixmixailov
+/tests/test_*_handler*.py @mixmixailov
+
+# Services - Business logic
+/app/services/ @mixmixailov  
+/tests/test_*_service*.py @mixmixailov
+
+# Database - Schema, queries, migrations
+/app/db/ @mixmixailov
+/db/ @mixmixailov
+/tests/test_*_db*.py @mixmixailov
+/tests/test_migrate*.py @mixmixailov
+/tests/test_wal*.py @mixmixailov
+
+# Payments - Payment processing, subscriptions
+/app/services/payments.py @mixmixailov
+/app/handlers/payments.py @mixmixailov  
+/app/db/payments.py @mixmixailov
+/app/db/subscriptions.py @mixmixailov
+/tests/test_payment*.py @mixmixailov
+/tests/test_subscription*.py @mixmixailov
+
+# Queue - Background jobs, DLQ, scheduling
+/app/services/dlq.py @mixmixailov
+/app/services/send_queue.py @mixmixailov
+/app/sched/ @mixmixailov
+/app/worker.py @mixmixailov
+/tests/test_dlq*.py @mixmixailov
+/tests/test_send_queue*.py @mixmixailov
+
+# Internationalization
+/app/utils/lang.py @mixmixailov
+/app/locales/ @mixmixailov
+
+# CI/CD - Testing, deployment, automation
+/.github/ @mixmixailov
+/scripts/ @mixmixailov
+/tests/e2e/ @mixmixailov
+/docs/automation/ @mixmixailov
+/Dockerfile* @mixmixailov
+/docker-compose*.yml @mixmixailov
+/Makefile @mixmixailov
+/requirements*.txt @mixmixailov
+/pyproject.toml @mixmixailov
+
+# Documentation
+/docs/ @mixmixailov
+/README.md @mixmixailov
+/CONTRIBUTING.md @mixmixailov
+
+# Configuration  
+/app/config.py @mixmixailov
+/app/main.py @mixmixailov
+/.env* @mixmixailov
