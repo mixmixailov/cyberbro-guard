@@ -91,10 +91,16 @@ class Settings(BaseSettings):
     CLEANUP_REMINDERS_DAYS: int = 30
     CLEANUP_TICKETS_DAYS: int = 90
 
-    # Exponential backoff for outbound API calls (send_queue)
+        # Exponential backoff for outbound API calls (send_queue)
     BACKOFF_BASE: float = 0.5  # Base backoff delay in seconds
-    BACKOFF_MAX: float = 20.0  # Maximum backoff delay in seconds  
+    BACKOFF_MAX: float = 20.0  # Maximum backoff delay in seconds
     BACKOFF_JITTER: str = "full"  # Jitter type: full|none|decorrelated
+    
+    # Telegram API configuration for testing
+    TELEGRAM_API_BASE: str = "https://api.telegram.org"  # Can be overridden for testing
+    
+    # Database backup configuration
+    BACKUP_RETENTION: int = 7  # Keep last N backup files
 
     model_config = SettingsConfigDict(
         env_file=".env",

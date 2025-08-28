@@ -24,11 +24,13 @@ from .services.idempotency import IdempotencyStore, make_key
 from .services.idempotency_guard import with_idempotency
 from .utils.security import verify_secret
 from .services.rate_limit import TokenBucket
+from .services.rate_limits import init_rate_limit_service, get_rate_limit_service
 from .sched.ratelimit_cleanup import run_cleanup_job
 from .utils.scheduler import Scheduler
 from .services.subscriptions import run_reminders, expire_due, cleanup_old_data
 from .services.send_queue import SendQueue
 from .services.dlq import add_failed_update_to_dlq
+from .services.maintenance import MaintenanceService
 from .sched.idempotency_purge import run_purge_job
 
 logger = logging.getLogger(__name__)
@@ -36,6 +38,7 @@ logger = logging.getLogger(__name__)
 
 application: Application | None = None  # PTB Application (module-level)
 scheduler_ref: Scheduler | None = None
+maintenance_service: MaintenanceService | None = None
 _seen_updates: set[int] = set()
 _seen_queue: deque[int] = deque(maxlen=5000)
 callback_bucket: TokenBucket | None = None
@@ -101,11 +104,15 @@ async def lifespan(app: FastAPI):
         logger.error("BOT_TOKEN пуст. HTTP-сервер стартует, но бот не активен. Укажи BOT_TOKEN в переменных окружения.")
         application = None
     else:
-        application = (
-            Application.builder()
-            .token(settings.BOT_TOKEN)
-            .build()
-        )
+        # Configure application with custom API base for testing
+        app_builder = Application.builder().token(settings.BOT_TOKEN)
+        
+        # Use custom Telegram API base URL if specified (for testing)
+        if settings.TELEGRAM_API_BASE != "https://api.telegram.org":
+            logger.info("Using custom Telegram API base: %s", settings.TELEGRAM_API_BASE)
+            app_builder = app_builder.base_url(settings.TELEGRAM_API_BASE)
+        
+        application = app_builder.build()
         await application.initialize()
         setup_handlers(application)
         # Опциональная регистрация вебхука при наличии PUBLIC_URL и включённом режиме webhook
@@ -133,6 +140,15 @@ async def lifespan(app: FastAPI):
             logger.info("SendQueue started")
         except Exception as exc:  # noqa: BLE001
             logger.error("SendQueue start failed: %s", exc)
+            
+        # Initialize maintenance service
+        try:
+            global maintenance_service
+            maintenance_service = MaintenanceService()
+            await maintenance_service.start()
+            logger.info("Maintenance service started")
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Maintenance service start failed: %s", exc)
         # Start polling if enabled
         global update_queue, worker_task
         if settings.USE_POLLING:
@@ -152,12 +168,13 @@ async def lifespan(app: FastAPI):
                 
                 while True:
                     upd = await update_queue.get()
-                    attempt_count = 0
-                    last_error = None
-                    
-                    # Retry loop with DLQ fallback
-                    while attempt_count < max_attempts:
-                        attempt_count += 1
+                    try:
+                        attempt_count = 0
+                        last_error = None
+                        
+                        # Retry loop with DLQ fallback
+                        while attempt_count < max_attempts:
+                            attempt_count += 1
                         try:
                             # Correlate ids for logs
                             try:
@@ -210,7 +227,6 @@ async def lifespan(app: FastAPI):
                                 # Wait before retry (simple exponential backoff)
                                 wait_time = 2 ** (attempt_count - 1)  # 1s, 2s, 4s...
                                 await asyncio.sleep(wait_time)
-                    
                     finally:
                         update_queue.task_done()
             worker_task = asyncio.create_task(_worker())
@@ -240,7 +256,11 @@ async def lifespan(app: FastAPI):
             scheduler_ref.add_cron(cleanup_old_data, settings.SCHED_CRON_CLEANUP, name="cleanup_old_data")
             scheduler_ref.add_cron(run_purge_job, "*/10 * * * *", name="idmp_purge")
             scheduler_ref.start()
-        # Initialize callback rate limit bucket
+        # Initialize adaptive rate limit service
+        await init_rate_limit_service()
+        logger.info("Adaptive rate limit service initialized")
+        
+        # Initialize callback rate limit bucket (legacy - will be replaced by adaptive service)
         global callback_bucket
         callback_bucket = TokenBucket(rate=6, per=10.0, burst=6.0, cool_down=15.0)
         if scheduler_ref:
@@ -272,6 +292,12 @@ async def lifespan(app: FastAPI):
                 worker_task.cancel()
             except Exception:
                 pass
+        if maintenance_service:
+            try:
+                await maintenance_service.stop()
+                logger.info("Maintenance service stopped")
+            except Exception as exc:  # noqa: BLE001
+                logger.error("Maintenance service stop error: %s", exc)
         if scheduler_ref:
             try:
                 scheduler_ref.shutdown()

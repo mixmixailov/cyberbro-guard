@@ -1,0 +1,281 @@
+name: Compliance & MCP Guard
+
+on:
+  push:
+    branches: [ main, 'release/*' ]
+  pull_request:
+    branches: [ main, 'release/*' ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preflight:
+    name: Rules Compliance Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Make scripts executable
+      run: chmod +x scripts/check_rules.sh
+      
+    - name: Run rules compliance check
+      run: ./scripts/check_rules.sh
+      
+    - name: Check essential artifacts exist
+      run: |
+        echo "Checking for essential artifacts..."
+        
+        # Rules and documentation
+        test -f "scripts/check_rules.sh" || (echo "❌ Missing: scripts/check_rules.sh" && exit 1)
+        test -f "docs/automation/rules_compliance.md" || (echo "❌ Missing: docs/automation/rules_compliance.md" && exit 1)
+        
+        # MCP sanity results
+        test -d "docs/automation/mcp_sanity" || (echo "❌ Missing: docs/automation/mcp_sanity/" && exit 1)
+        test -f "docs/automation/mcp_sanity/README.md" || (echo "❌ Missing: MCP sanity README" && exit 1)
+        
+        # Check for at least one MCP result file
+        if ! ls docs/automation/mcp_sanity/*.txt 1> /dev/null 2>&1; then
+          echo "❌ Missing: MCP sanity check results"
+          exit 1
+        fi
+        
+        # E2E tests
+        test -d "tests/e2e" || (echo "❌ Missing: tests/e2e/" && exit 1)
+        test -f "tests/e2e/conftest.py" || (echo "❌ Missing: E2E test configuration" && exit 1)
+        
+        # Check for at least one E2E test file
+        if ! ls tests/e2e/test_*.py tests/e2e/*.spec.ts 1> /dev/null 2>&1; then
+          echo "❌ Missing: E2E test files"
+          exit 1
+        fi
+        
+        echo "✅ All essential artifacts present"
+
+  mcp-proof:
+    name: MCP Sanity Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    needs: preflight
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js for Playwright
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install Node dependencies
+      run: npm install
+      
+    - name: Validate MCP configuration
+      run: |
+        echo "Checking MCP configuration..."
+        
+        # Check MCP config file exists
+        if [ ! -f ".cursor/mcp.json" ]; then
+          echo "⚠️  MCP configuration not found (.cursor/mcp.json)"
+          echo "This is expected in CI environment"
+        else
+          echo "✅ MCP configuration file found"
+          
+          # Validate JSON syntax
+          if jq empty .cursor/mcp.json; then
+            echo "✅ MCP configuration is valid JSON"
+          else
+            echo "❌ MCP configuration has invalid JSON syntax"
+            exit 1
+          fi
+        fi
+        
+    - name: Check MCP sanity results
+      run: |
+        echo "Validating MCP sanity check results..."
+        
+        # Check if sanity results exist
+        if [ ! -d "docs/automation/mcp_sanity" ]; then
+          echo "❌ MCP sanity directory missing"
+          exit 1
+        fi
+        
+        # Check for result files
+        result_files=$(ls docs/automation/mcp_sanity/*.txt 2>/dev/null | wc -l)
+        if [ "$result_files" -lt 1 ]; then
+          echo "❌ No MCP sanity result files found"
+          exit 1
+        fi
+        
+        echo "✅ Found $result_files MCP sanity result files"
+        
+        # Check for specific MCP results
+        for mcp in context7 playwright brave-search; do
+          if ls docs/automation/mcp_sanity/${mcp}_*.txt 1> /dev/null 2>&1; then
+            echo "✅ $mcp sanity results found"
+          else
+            echo "⚠️  $mcp sanity results not found"
+          fi
+        done
+
+  structure-validation:
+    name: Project Structure Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    needs: preflight
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Validate project structure
+      run: |
+        echo "Validating essential project structure..."
+        
+        # Core application structure
+        essential_dirs=(
+          "app"
+          "app/db"
+          "app/handlers"
+          "app/services"
+          "app/middleware"
+          "tests"
+          "tests/e2e"
+          "docs"
+          "docs/automation"
+          "scripts"
+        )
+        
+        for dir in "${essential_dirs[@]}"; do
+          if [ -d "$dir" ]; then
+            echo "✅ Directory exists: $dir"
+          else
+            echo "❌ Missing directory: $dir"
+            exit 1
+          fi
+        done
+        
+        # Essential files
+        essential_files=(
+          "README.md"
+          "requirements.txt"
+          "requirements-dev.txt"
+          "Dockerfile"
+          "docker-compose.yml"
+          "Makefile"
+          "pyproject.toml"
+          "app/main.py"
+          "app/config.py"
+        )
+        
+        for file in "${essential_files[@]}"; do
+          if [ -f "$file" ]; then
+            echo "✅ File exists: $file"
+          else
+            echo "❌ Missing file: $file"
+            exit 1
+          fi
+        done
+
+  documentation-check:
+    name: Documentation Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    needs: preflight
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Check documentation completeness
+      run: |
+        echo "Checking documentation completeness..."
+        
+        # Core documentation files
+        doc_files=(
+          "docs/automation/rules_compliance.md"
+          "docs/automation/mcp_sanity/README.md"
+          "README.md"
+        )
+        
+        for file in "${doc_files[@]}"; do
+          if [ -f "$file" ]; then
+            echo "✅ Documentation exists: $file"
+            
+            # Check if file is not empty
+            if [ -s "$file" ]; then
+              echo "✅ Documentation has content: $file"
+            else
+              echo "❌ Documentation is empty: $file"
+              exit 1
+            fi
+          else
+            echo "❌ Missing documentation: $file"
+            exit 1
+          fi
+        done
+        
+        # Check for project description in README
+        if grep -q "CyberBro Guard" README.md; then
+          echo "✅ Project name found in README"
+        else
+          echo "⚠️  Project name not found in README"
+        fi
+
+  guard-summary:
+    name: Guard Summary
+    runs-on: ubuntu-latest
+    needs: [preflight, mcp-proof, structure-validation, documentation-check]
+    if: always()
+    
+    steps:
+    - name: Guard Summary
+      run: |
+        echo "🛡️ Compliance & MCP Guard Summary"
+        echo "================================="
+        echo ""
+        
+        # Check job statuses
+        if [ "${{ needs.preflight.result }}" = "success" ]; then
+          echo "✅ Rules Compliance: PASSED"
+        else
+          echo "❌ Rules Compliance: FAILED"
+        fi
+        
+        if [ "${{ needs.mcp-proof.result }}" = "success" ]; then
+          echo "✅ MCP Sanity: PASSED"
+        else
+          echo "❌ MCP Sanity: FAILED"
+        fi
+        
+        if [ "${{ needs.structure-validation.result }}" = "success" ]; then
+          echo "✅ Project Structure: PASSED"
+        else
+          echo "❌ Project Structure: FAILED"
+        fi
+        
+        if [ "${{ needs.documentation-check.result }}" = "success" ]; then
+          echo "✅ Documentation: PASSED"
+        else
+          echo "❌ Documentation: FAILED"
+        fi
+        
+        echo ""
+        
+        # Overall status
+        if [ "${{ needs.preflight.result }}" = "success" ] && \
+           [ "${{ needs.mcp-proof.result }}" = "success" ] && \
+           [ "${{ needs.structure-validation.result }}" = "success" ] && \
+           [ "${{ needs.documentation-check.result }}" = "success" ]; then
+          echo "🎉 All guard checks PASSED - Project is compliant!"
+          exit 0
+        else
+          echo "🚨 Some guard checks FAILED - Fix issues before proceeding"
+          exit 1
+        fi

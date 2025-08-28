@@ -1,17 +1,13 @@
 """Pytest configuration for E2E tests."""
 
 import pytest
+import pytest_asyncio
 import asyncio
 import os
 from playwright.async_api import async_playwright
 
 
-@pytest.fixture(scope="session")
-def event_loop():
-    """Create an instance of the default event loop for the test session."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
+# Event loop configuration handled by pytest-asyncio
 
 
 @pytest.fixture(scope="session")
@@ -20,7 +16,7 @@ def base_url():
     return os.getenv("E2E_BASE_URL", "http://localhost:8080")
 
 
-@pytest.fixture(scope="session")
+@pytest_asyncio.fixture(scope="session")
 async def browser():
     """Create a browser instance for the test session."""
     async with async_playwright() as p:
@@ -32,7 +28,18 @@ async def browser():
         await browser.close()
 
 
-@pytest.fixture(scope="function")
+@pytest_asyncio.fixture(scope="session")
+async def browser_context(browser):
+    """Create a browser context for the test session."""
+    context = await browser.new_context(
+        viewport={"width": 1920, "height": 1080},
+        ignore_https_errors=True
+    )
+    yield context
+    await context.close()
+
+
+@pytest_asyncio.fixture(scope="function")
 async def page(browser):
     """Create a new page for each test."""
     context = await browser.new_context(

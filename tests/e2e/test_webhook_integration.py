@@ -10,22 +10,8 @@ import json
 class TestWebhookIntegration:
     """E2E tests for webhook endpoint and integration."""
 
-    @pytest.fixture(scope="class")
-    async def base_url(self):
-        """Base URL for the application."""
-        import os
-        return os.getenv("E2E_BASE_URL", "http://localhost:8080")
 
-    @pytest.fixture(scope="class")
-    async def browser_context(self):
-        """Shared browser context for E2E tests."""
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            context = await browser.new_context(
-                viewport={"width": 1920, "height": 1080}
-            )
-            yield context
-            await browser.close()
+
 
     async def test_health_endpoints(self, browser_context, base_url):
         """Test that health endpoints respond correctly."""

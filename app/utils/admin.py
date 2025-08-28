@@ -21,6 +21,37 @@ async def admin_required(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return False
 
 
+def is_admin(user_id: int | None) -> bool:
+    """Check if user ID is in admin list."""
+    if not user_id:
+        return False
+    settings = get_settings()
+    return int(user_id) in settings.ADMIN_IDS
+
+
+def is_admin_request(update: Update) -> bool:
+    """Check if request comes from admin user."""
+    user = update.effective_user
+    if not user:
+        return False
+    return is_admin(user.id)
+
+
+def admin_only(func):
+    """Decorator to restrict access to admin users only."""
+    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not is_admin_request(update):
+            if update.message:
+                await update.message.reply_text("❌ This command is only available to administrators.")
+            return
+        return await func(update, context)
+    return wrapper
+
+
+
+
+
+
 
 
 

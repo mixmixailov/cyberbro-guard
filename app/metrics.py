@@ -119,6 +119,34 @@ dlq_replayed_total = Counter(
     registry=REGISTRY,
 )
 
+# WAL checkpoint metrics
+wal_pages = Gauge(
+    "cyberbro_wal_pages",
+    "Current number of pages in WAL file",
+    registry=REGISTRY,
+)
+
+wal_size_bytes = Gauge(
+    "cyberbro_wal_size_bytes", 
+    "Current WAL file size in bytes",
+    registry=REGISTRY,
+)
+
+checkpoint_performed_total = Counter(
+    "cyberbro_checkpoint_performed_total",
+    "Total WAL checkpoints performed",
+    labelnames=("mode", "status"),
+    registry=REGISTRY,
+)
+
+checkpoint_duration_seconds = Histogram(
+    "cyberbro_checkpoint_duration_seconds",
+    "WAL checkpoint operation duration in seconds",
+    labelnames=("mode",),
+    buckets=(0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, float("inf")),
+    registry=REGISTRY,
+)
+
 
 def timeit(hist: Histogram, label_value: str):  # type: ignore[name-defined]
     def decorator(fn):  # type: ignore[no-untyped-def]

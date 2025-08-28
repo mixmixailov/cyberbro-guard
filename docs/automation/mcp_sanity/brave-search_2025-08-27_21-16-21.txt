@@ -1,0 +1,49 @@
+MCP Sanity Check: Brave Search
+===============================
+Timestamp: 2025-08-27_21-16-21
+Test Query: telegram bot api python rate limiting
+
+STATUS: ⚠️ PARTIAL FAILURE
+
+Error Details:
+- Deep search returned HTTP 422 error
+- Message: "Brave Search API error: 422"
+- This suggests API authentication or quota issues
+
+Possible Causes:
+1. API key not configured or invalid
+2. Rate limit exceeded
+3. Query format not supported by deep search
+4. Temporary API service issue
+
+Troubleshooting Attempted:
+- Tested basic deep-search functionality
+- Used standard parameters (query, results=2, depth=1)
+- Error persisted across attempts
+
+Workaround Options:
+1. Check MCP server configuration for API credentials
+2. Try alternative search engines if available
+3. Use Context7 for documentation-related searches
+4. Implement fallback search mechanisms
+
+Impact Assessment:
+- Non-critical: Other MCPs functional
+- Web search capability temporarily unavailable
+- Development can continue with other tools
+- Manual web search as temporary solution
+
+Recommendations:
+1. Verify Brave Search API key configuration
+2. Check API quota/billing status
+3. Test with simpler queries
+4. Consider backup search providers
+5. Monitor API status page
+
+Follow-up Actions:
+- Re-test after 24 hours
+- Contact Brave Search support if issue persists
+- Document alternative search strategies
+- Update MCP configuration if needed
+
+Note: This is not a blocking issue for core development workflows.

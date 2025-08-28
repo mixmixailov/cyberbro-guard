@@ -4,7 +4,7 @@ import logging
 import sqlite3
 import json
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -195,5 +195,112 @@ def execute_immediate(query: str, params: Iterable[Any] = ()) -> int:
     - Critical state changes
     """
     return execute(query, params, immediate=True)
+
+
+def get_wal_info() -> Dict[str, Any]:
+    """Get WAL file information and statistics.
+    
+    Returns:
+        Dict with wal_pages, wal_size_bytes, main_db_size_bytes
+    """
+    try:
+        with _get_conn() as conn:
+            # Get WAL page count
+            wal_pages_result = conn.execute("PRAGMA wal_checkpoint(PASSIVE);").fetchone()
+            wal_pages = wal_pages_result[1] if wal_pages_result and len(wal_pages_result) > 1 else 0
+            
+            # Get database file sizes
+            main_db_size = 0
+            wal_size = 0
+            
+            if APP_DB_PATH.exists():
+                main_db_size = APP_DB_PATH.stat().st_size
+                
+            wal_path = APP_DB_PATH.with_suffix('.db-wal')
+            if wal_path.exists():
+                wal_size = wal_path.stat().st_size
+            
+            return {
+                "wal_pages": wal_pages,
+                "wal_size_bytes": wal_size,
+                "main_db_size_bytes": main_db_size,
+                "wal_path": str(wal_path),
+                "main_db_path": str(APP_DB_PATH)
+            }
+            
+    except Exception as e:
+        logger.error("Failed to get WAL info: %s", e)
+        return {
+            "wal_pages": 0,
+            "wal_size_bytes": 0,
+            "main_db_size_bytes": 0,
+            "error": str(e)
+        }
+
+
+def checkpoint_wal(mode: str = "TRUNCATE") -> Dict[str, Any]:
+    """Perform WAL checkpoint operation.
+    
+    Args:
+        mode: Checkpoint mode - PASSIVE, FULL, RESTART, or TRUNCATE
+        
+    Returns:
+        Dict with checkpoint results and timing
+    """
+    import time
+    start_time = time.perf_counter()
+    
+    try:
+        with _get_conn() as conn:
+            # Get WAL info before checkpoint
+            before_info = get_wal_info()
+            
+            # Perform checkpoint
+            result = conn.execute(f"PRAGMA wal_checkpoint({mode});").fetchone()
+            
+            # Get WAL info after checkpoint
+            after_info = get_wal_info()
+            
+            duration_ms = (time.perf_counter() - start_time) * 1000
+            
+            logger.info(
+                "WAL checkpoint completed",
+                extra={
+                    "mode": mode,
+                    "duration_ms": round(duration_ms, 2),
+                    "pages_before": before_info.get("wal_pages", 0),
+                    "pages_after": after_info.get("wal_pages", 0),
+                    "wal_size_before": before_info.get("wal_size_bytes", 0),
+                    "wal_size_after": after_info.get("wal_size_bytes", 0)
+                }
+            )
+            
+            return {
+                "success": True,
+                "mode": mode,
+                "duration_ms": round(duration_ms, 2),
+                "pages_before": before_info.get("wal_pages", 0),
+                "pages_after": after_info.get("wal_pages", 0),
+                "wal_size_before": before_info.get("wal_size_bytes", 0),
+                "wal_size_after": after_info.get("wal_size_bytes", 0),
+                "result": result
+            }
+            
+    except Exception as e:
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        logger.error(
+            "WAL checkpoint failed",
+            extra={
+                "mode": mode,
+                "duration_ms": round(duration_ms, 2),
+                "error": str(e)
+            }
+        )
+        return {
+            "success": False,
+            "mode": mode,
+            "duration_ms": round(duration_ms, 2),
+            "error": str(e)
+        }
 
 
