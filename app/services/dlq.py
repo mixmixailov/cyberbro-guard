@@ -2,18 +2,18 @@
 
 Handles storage, retrieval, and replay of failed processing tasks.
 """
+
 from __future__ import annotations
 
 import json
 import logging
 import traceback
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
-from dataclasses import dataclass
 
 from ..db.session import execute_immediate, fetchall, fetchone
-from ..metrics import dlq_size_gauge, dlq_in_total, dlq_replayed_total
-
+from ..metrics import dlq_in_total, dlq_replayed_total, dlq_size_gauge
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class DLQItem:
     """Dead Letter Queue item representation."""
+
     id: int
     job_id: str
     type: str
@@ -45,7 +46,7 @@ class DLQItem:
             created_at=row["created_at"],
             last_attempt_at=row["last_attempt_at"],
             replayed_at=row["replayed_at"],
-            metadata=json.loads(row["metadata"]) if row["metadata"] else None
+            metadata=json.loads(row["metadata"]) if row["metadata"] else None,
         )
 
 
@@ -59,10 +60,10 @@ class DLQService:
         payload: Dict[str, Any],
         error: Exception | str,
         attempts: int,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> int:
         """Add a failed job to the Dead Letter Queue.
-        
+
         Args:
             job_id: Unique identifier for the job
             job_type: Type of job (update, webhook, scheduled_job, etc)
@@ -70,7 +71,7 @@ class DLQService:
             error: Error that caused the failure
             attempts: Number of retry attempts made
             metadata: Optional additional metadata
-            
+
         Returns:
             DLQ record ID
         """
@@ -90,8 +91,8 @@ class DLQService:
                 error_str,
                 attempts,
                 datetime.now(timezone.utc).isoformat(),
-                json.dumps(metadata) if metadata else None
-            )
+                json.dumps(metadata) if metadata else None,
+            ),
         )
 
         # Update metrics
@@ -105,8 +106,8 @@ class DLQService:
                 "job_id": job_id,
                 "job_type": job_type,
                 "attempts": attempts,
-                "error": str(error)[:200] + "..." if len(str(error)) > 200 else str(error)
-            }
+                "error": str(error)[:200] + "..." if len(str(error)) > 200 else str(error),
+            },
         )
 
         return dlq_id
@@ -119,17 +120,15 @@ class DLQService:
 
     @staticmethod
     def get_dlq_items(
-        job_type: Optional[str] = None,
-        only_unreplayed: bool = True,
-        limit: int = 100
+        job_type: Optional[str] = None, only_unreplayed: bool = True, limit: int = 100
     ) -> List[DLQItem]:
         """Get DLQ items with optional filtering.
-        
+
         Args:
             job_type: Filter by job type
             only_unreplayed: Only return items not yet replayed
             limit: Maximum number of items to return
-            
+
         Returns:
             List of DLQ items
         """
@@ -144,7 +143,7 @@ class DLQService:
             conditions.append("replayed_at IS NULL")
 
         where_clause = " AND ".join(conditions) if conditions else "1=1"
-        
+
         rows = fetchall(
             f"""
             SELECT * FROM dlq 
@@ -152,7 +151,7 @@ class DLQService:
             ORDER BY created_at DESC 
             LIMIT ?
             """,
-            params + [limit]
+            params + [limit],
         )
 
         return [DLQItem.from_row(row) for row in rows]
@@ -160,10 +159,10 @@ class DLQService:
     @staticmethod
     def mark_replayed(dlq_id: int) -> bool:
         """Mark a DLQ item as successfully replayed.
-        
+
         Args:
             dlq_id: DLQ record ID
-            
+
         Returns:
             True if item was found and marked, False otherwise
         """
@@ -178,7 +177,7 @@ class DLQService:
             SET replayed_at = ?
             WHERE id = ? AND replayed_at IS NULL
             """,
-            (datetime.now(timezone.utc).isoformat(), dlq_id)
+            (datetime.now(timezone.utc).isoformat(), dlq_id),
         )
 
         if rows_affected > 0:
@@ -188,11 +187,7 @@ class DLQService:
 
             logger.info(
                 "DLQ item replayed successfully",
-                extra={
-                    "dlq_id": dlq_id,
-                    "job_id": item.job_id,
-                    "job_type": item.type
-                }
+                extra={"dlq_id": dlq_id, "job_id": item.job_id, "job_type": item.type},
             )
             return True
 
@@ -201,7 +196,7 @@ class DLQService:
     @staticmethod
     def get_stats_by_type() -> Dict[str, Dict[str, int]]:
         """Get DLQ statistics grouped by job type.
-        
+
         Returns:
             Dict with type as key and stats dict as value
             Example: {"update": {"total": 10, "unreplayed": 3}, ...}
@@ -222,8 +217,8 @@ class DLQService:
         return {
             row["type"]: {
                 "total": row["total"],
-                "unreplayed": row["unreplayed"], 
-                "replayed": row["replayed"]
+                "unreplayed": row["unreplayed"],
+                "replayed": row["replayed"],
             }
             for row in rows
         }
@@ -231,10 +226,10 @@ class DLQService:
     @staticmethod
     def cleanup_old_replayed(days_old: int = 30) -> int:
         """Remove old replayed items from DLQ.
-        
+
         Args:
             days_old: Remove replayed items older than this many days
-            
+
         Returns:
             Number of items removed
         """
@@ -244,24 +239,23 @@ class DLQService:
             WHERE replayed_at IS NOT NULL 
             AND replayed_at < datetime('now', '-' || ? || ' days')
             """,
-            (days_old,)
+            (days_old,),
         )
 
         logger.info(f"Cleaned up {rows_affected} old replayed DLQ items")
-        
+
         # Update gauges for all types
         stats = DLQService.get_stats_by_type()
         for job_type in stats:
             DLQService._update_size_gauge(job_type)
-            
+
         return rows_affected
 
     @staticmethod
     def _update_size_gauge(job_type: str) -> None:
         """Update the DLQ size gauge for a specific job type."""
         count = fetchone(
-            "SELECT COUNT(*) as count FROM dlq WHERE type = ? AND replayed_at IS NULL",
-            (job_type,)
+            "SELECT COUNT(*) as count FROM dlq WHERE type = ? AND replayed_at IS NULL", (job_type,)
         )
         if count:
             dlq_size_gauge.labels(type=job_type).set(count["count"])
@@ -279,12 +273,14 @@ def add_failed_update_to_dlq(update_data: Dict[str, Any], error: Exception, atte
         attempts=attempts,
         metadata={
             "chat_id": update_data.get("message", {}).get("chat", {}).get("id"),
-            "user_id": update_data.get("message", {}).get("from", {}).get("id")
-        }
+            "user_id": update_data.get("message", {}).get("from", {}).get("id"),
+        },
     )
 
 
-def add_failed_job_to_dlq(job_name: str, job_data: Dict[str, Any], error: Exception, attempts: int) -> int:
+def add_failed_job_to_dlq(
+    job_name: str, job_data: Dict[str, Any], error: Exception, attempts: int
+) -> int:
     """Add a failed scheduled job to DLQ."""
     return DLQService.add_to_dlq(
         job_id=f"job_{job_name}_{datetime.now().timestamp()}",
@@ -292,5 +288,5 @@ def add_failed_job_to_dlq(job_name: str, job_data: Dict[str, Any], error: Except
         payload={"job_name": job_name, "job_data": job_data},
         error=error,
         attempts=attempts,
-        metadata={"job_name": job_name}
+        metadata={"job_name": job_name},
     )

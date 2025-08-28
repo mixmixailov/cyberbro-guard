@@ -2,6 +2,7 @@
 
 import pytest
 from pydantic import ValidationError
+
 from app.config import Settings
 
 
@@ -12,7 +13,7 @@ class TestWebhookSecretValidation:
         """Test that production mode (DEBUG=False) requires WEBHOOK_SECRET."""
         with pytest.raises(ValidationError) as exc_info:
             Settings(DEBUG=False, WEBHOOK_SECRET="")
-        
+
         error = exc_info.value
         assert "WEBHOOK_SECRET is required when DEBUG is false" in str(error)
 
@@ -20,7 +21,7 @@ class TestWebhookSecretValidation:
         """Test that production mode rejects whitespace-only secrets."""
         with pytest.raises(ValidationError) as exc_info:
             Settings(DEBUG=False, WEBHOOK_SECRET="   ")
-        
+
         error = exc_info.value
         assert "WEBHOOK_SECRET is required when DEBUG is false" in str(error)
 
@@ -28,7 +29,7 @@ class TestWebhookSecretValidation:
         """Test that production mode rejects None webhook secret."""
         with pytest.raises(ValidationError) as exc_info:
             Settings(DEBUG=False, WEBHOOK_SECRET=None)
-        
+
         error = exc_info.value
         assert "WEBHOOK_SECRET is required when DEBUG is false" in str(error)
 
@@ -66,7 +67,7 @@ class TestWebhookSecretValidation:
         """Test that validation error contains helpful guidance."""
         with pytest.raises(ValidationError) as exc_info:
             Settings(DEBUG=False, WEBHOOK_SECRET="")
-        
+
         error_msg = str(exc_info.value)
         assert "WEBHOOK_SECRET is required when DEBUG is false" in error_msg
         assert "Set WEBHOOK_SECRET environment variable" in error_msg
@@ -79,8 +80,8 @@ class TestWebhookSecretValidation:
         monkeypatch.delenv("WEBHOOK_SECRET", raising=False)
         # Also clear any .env file loading by temporarily disabling it
         monkeypatch.setenv("WEBHOOK_SECRET", "")  # Force empty value
-        
-        # Default WEBHOOK_SECRET is None, DEBUG is False by default  
+
+        # Default WEBHOOK_SECRET is None, DEBUG is False by default
         with pytest.raises(ValidationError):
             Settings(DEBUG=False, WEBHOOK_SECRET="")  # Explicitly set empty
 
@@ -89,7 +90,7 @@ class TestWebhookSecretValidation:
         # Test production mode with env var set
         monkeypatch.setenv("DEBUG", "false")
         monkeypatch.setenv("WEBHOOK_SECRET", "env_secret_123")
-        
+
         settings = Settings()
         assert settings.DEBUG is False
         assert settings.WEBHOOK_SECRET == "env_secret_123"
@@ -98,21 +99,21 @@ class TestWebhookSecretValidation:
         """Test validation fails with empty env var in production."""
         monkeypatch.setenv("DEBUG", "false")
         monkeypatch.setenv("WEBHOOK_SECRET", "")
-        
+
         with pytest.raises(ValidationError) as exc_info:
             Settings()
-        
+
         assert "WEBHOOK_SECRET is required when DEBUG is false" in str(exc_info.value)
 
     def test_case_sensitivity_of_debug(self):
         """Test that DEBUG value parsing is case-sensitive as configured."""
         # DEBUG should be parsed as boolean, test different values
-        
+
         # String "false" should be parsed as boolean False
-        settings = Settings(DEBUG="false", WEBHOOK_SECRET="test_secret")  # type: ignore
+        Settings(DEBUG="false", WEBHOOK_SECRET="test_secret")  # type: ignore
         # Note: Pydantic converts string "false" to boolean False
-        
-        # This test documents current behavior - if it fails, 
+
+        # This test documents current behavior - if it fails,
         # it means pydantic boolean parsing changed
         try:
             Settings(DEBUG="False", WEBHOOK_SECRET="")  # type: ignore

@@ -1,19 +1,26 @@
 """Handlers package setup for CyberBro Guard bot."""
 
 import time
-from telegram.ext import Application, MessageHandler, filters, CommandHandler, CallbackQueryHandler
-from telegram.ext import ApplicationHandlerStop
+
+from telegram.ext import (
+    Application,
+    ApplicationHandlerStop,
+    CallbackQueryHandler,
+    CommandHandler,
+    MessageHandler,
+    filters,
+)
 
 from app.config import get_settings
+from app.services.moderation import ModerationService
 from app.utils.lang import t
 
+from .admin import register_admin_handlers
+from .admin_rate_limits import register_admin_rate_limit_handlers
 from .basic import register as register_basic
 from .group import register as register_group
 from .payments import register as register_payments
 from .settings import register as register_settings
-from .admin import register_admin_handlers
-from .admin_rate_limits import register_admin_rate_limit_handlers
-from app.services.moderation import ModerationService
 
 
 async def _rate_limit_handler(update, context) -> None:  # type: ignore[no-untyped-def]
@@ -26,7 +33,12 @@ async def _rate_limit_handler(update, context) -> None:  # type: ignore[no-untyp
     last = context.user_data.get("_last_cmd_ts", 0)
     if now - float(last) < 2.0:
         try:
-            await message.reply_text(t("rate.limit", lang=getattr(user, "language_code", None) or settings.DEFAULT_LOCALE))
+            await message.reply_text(
+                t(
+                    "rate.limit",
+                    lang=getattr(user, "language_code", None) or settings.DEFAULT_LOCALE,
+                )
+            )
         finally:
             raise ApplicationHandlerStop
     context.user_data["_last_cmd_ts"] = now
@@ -44,13 +56,8 @@ def setup_handlers(app: Application) -> None:
     register_admin_rate_limit_handlers(app)
     # Support command in basic module
     from .basic import support_cmd
+
     app.add_handler(CommandHandler("support", support_cmd))
     # Moderation callbacks (captcha)
     service = ModerationService()
     app.add_handler(CallbackQueryHandler(service.on_callback), group=1)
-
-
-
-
-
-

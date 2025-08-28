@@ -1,7 +1,7 @@
 from typing import Iterable
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -91,14 +91,14 @@ class Settings(BaseSettings):
     CLEANUP_REMINDERS_DAYS: int = 30
     CLEANUP_TICKETS_DAYS: int = 90
 
-        # Exponential backoff for outbound API calls (send_queue)
+    # Exponential backoff for outbound API calls (send_queue)
     BACKOFF_BASE: float = 0.5  # Base backoff delay in seconds
     BACKOFF_MAX: float = 20.0  # Maximum backoff delay in seconds
     BACKOFF_JITTER: str = "full"  # Jitter type: full|none|decorrelated
-    
+
     # Telegram API configuration for testing
     TELEGRAM_API_BASE: str = "https://api.telegram.org"  # Can be overridden for testing
-    
+
     # Database backup configuration
     BACKUP_RETENTION: int = 7  # Keep last N backup files
 
@@ -115,7 +115,7 @@ class Settings(BaseSettings):
         """Validate WEBHOOK_SECRET is set in production mode."""
         # Get DEBUG value from the same validation context
         debug_value = info.data.get("DEBUG", False)
-        
+
         if not debug_value and not (v or "").strip():
             raise ValueError(
                 "WEBHOOK_SECRET is required when DEBUG is false. "

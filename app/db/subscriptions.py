@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any
 
-from .session import execute, fetchone, fetchall
+from .session import execute, fetchall, fetchone
 
 
 def ensure_plan(code: str, price_xtr: int, period_days: int) -> None:
@@ -19,7 +19,9 @@ def ensure_plan(code: str, price_xtr: int, period_days: int) -> None:
 
 def upsert_subscription(tg_id: int, plan_code: str, period_days: int) -> int:
     now = datetime.utcnow()
-    sub = fetchone("SELECT id, until FROM subscriptions WHERE tg_id = ? AND plan_code = ?", (tg_id, plan_code))
+    sub = fetchone(
+        "SELECT id, until FROM subscriptions WHERE tg_id = ? AND plan_code = ?", (tg_id, plan_code)
+    )
     if sub and sub.get("until"):
         try:
             until = datetime.fromisoformat(sub["until"])
@@ -28,18 +30,29 @@ def upsert_subscription(tg_id: int, plan_code: str, period_days: int) -> int:
         if until < now:
             until = now
         until = until + timedelta(days=period_days)
-        execute("UPDATE subscriptions SET until = ? WHERE id = ?", (until.isoformat(timespec="seconds"), sub["id"]))
+        execute(
+            "UPDATE subscriptions SET until = ? WHERE id = ?",
+            (until.isoformat(timespec="seconds"), sub["id"]),
+        )
         return int(sub["id"])
     else:
         until = now + timedelta(days=period_days)
         return execute(
             "INSERT INTO subscriptions (tg_id, plan_code, until, created_at) VALUES (?, ?, ?, ?)",
-            (tg_id, plan_code, until.isoformat(timespec="seconds"), now.isoformat(timespec="seconds")),
+            (
+                tg_id,
+                plan_code,
+                until.isoformat(timespec="seconds"),
+                now.isoformat(timespec="seconds"),
+            ),
         )
 
 
 def get_subscription(tg_id: int, plan_code: str) -> dict[str, Any] | None:
-    return fetchone("SELECT id, tg_id, plan_code, until FROM subscriptions WHERE tg_id = ? AND plan_code = ?", (tg_id, plan_code))
+    return fetchone(
+        "SELECT id, tg_id, plan_code, until FROM subscriptions WHERE tg_id = ? AND plan_code = ?",
+        (tg_id, plan_code),
+    )
 
 
 def find_due_reminders() -> list[dict[str, Any]]:
@@ -89,7 +102,10 @@ def mark_reminder_sent(subscription_id: int, flag: str) -> None:
     if column:
         # Safe whitelist; column name is validated explicitly
         assert column in {"t3_sent", "t1_sent", "t0_sent"}  # nosemgrep: trusted whitelist
-        execute(f"UPDATE subscription_reminders SET {column} = 1 WHERE subscription_id = ?", (subscription_id,))
+        execute(
+            f"UPDATE subscription_reminders SET {column} = 1 WHERE subscription_id = ?",
+            (subscription_id,),
+        )
 
 
 def find_due_expire() -> list[dict[str, Any]]:
@@ -98,5 +114,3 @@ def find_due_expire() -> list[dict[str, Any]]:
         "SELECT id, tg_id, plan_code, until FROM subscriptions WHERE until IS NOT NULL AND until <= ?",
         (now,),
     )
-
-

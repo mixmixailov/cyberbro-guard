@@ -1,12 +1,13 @@
 """Smoke test for BEGIN IMMEDIATE functionality with concurrent writes."""
 
-import pytest
 import sqlite3
-import threading
-import time
 import tempfile
-from pathlib import Path
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
+
+import pytest
+
 from app.db.session import _get_conn, execute, execute_immediate
 
 
@@ -25,19 +26,19 @@ class TestBeginImmediateSmoke:
     def test_regular_connection_properties(self, temp_db_path):
         """Test that regular connections have correct properties."""
         conn = _get_conn()
-        
+
         # Check WAL mode is enabled
         result = conn.execute("PRAGMA journal_mode;").fetchone()
         assert result[0].upper() == "WAL"
-        
+
         # Check foreign keys are enabled
         result = conn.execute("PRAGMA foreign_keys;").fetchone()
         assert result[0] == 1
-        
+
         # Check busy timeout is set
         result = conn.execute("PRAGMA busy_timeout;").fetchone()
         assert result[0] == 5000
-        
+
         conn.close()
 
     def test_immediate_connection_starts_transaction(self, temp_db_path):
@@ -46,22 +47,22 @@ class TestBeginImmediateSmoke:
         with _get_conn() as conn:
             conn.execute("CREATE TABLE test_table (id INTEGER PRIMARY KEY, value TEXT);")
             conn.commit()
-        
+
         # Test immediate connection
         conn = _get_conn(immediate=True)
-        
+
         # Insert data (should be in transaction)
         conn.execute("INSERT INTO test_table (value) VALUES (?);", ("test",))
-        
+
         # Check data is not visible from another connection (still in transaction)
         with _get_conn() as other_conn:
             result = other_conn.execute("SELECT COUNT(*) FROM test_table;").fetchone()
             assert result[0] == 0  # Should be 0 because transaction not committed
-        
+
         # Commit and check data is now visible
         conn.commit()
         conn.close()
-        
+
         with _get_conn() as other_conn:
             result = other_conn.execute("SELECT COUNT(*) FROM test_table;").fetchone()
             assert result[0] == 1  # Should be 1 after commit
@@ -70,7 +71,9 @@ class TestBeginImmediateSmoke:
         """Test concurrent writes without BEGIN IMMEDIATE may cause database locked errors."""
         # Create test table
         with _get_conn() as conn:
-            conn.execute("CREATE TABLE concurrent_test (id INTEGER PRIMARY KEY, thread_id INTEGER);")
+            conn.execute(
+                "CREATE TABLE concurrent_test (id INTEGER PRIMARY KEY, thread_id INTEGER);"
+            )
             conn.commit()
 
         errors = []
@@ -93,18 +96,18 @@ class TestBeginImmediateSmoke:
         # Run concurrent writers
         num_threads = 5
         writes_per_thread = 10
-        
+
         with ThreadPoolExecutor(max_workers=num_threads) as executor:
             futures = [
                 executor.submit(write_worker, thread_id, writes_per_thread)
                 for thread_id in range(num_threads)
             ]
-            
+
             for future in as_completed(futures):
                 future.result()  # Wait for completion, will raise if worker failed
 
         print(f"Regular writes: {len(successful_writes)} successful, {len(errors)} errors")
-        
+
         # Note: This test might not always generate errors due to SQLite's robustness
         # but documents the potential for database locked errors
 
@@ -123,7 +126,9 @@ class TestBeginImmediateSmoke:
             for i in range(num_writes):
                 try:
                     # Use execute_immediate for critical writes
-                    execute_immediate("INSERT INTO immediate_test (thread_id) VALUES (?);", (thread_id,))
+                    execute_immediate(
+                        "INSERT INTO immediate_test (thread_id) VALUES (?);", (thread_id,)
+                    )
                     successful_writes.append((thread_id, i))
                     time.sleep(0.001)  # Small delay to increase contention
                 except sqlite3.OperationalError as e:
@@ -135,18 +140,18 @@ class TestBeginImmediateSmoke:
         # Run concurrent writers with immediate transactions
         num_threads = 5
         writes_per_thread = 10
-        
+
         with ThreadPoolExecutor(max_workers=num_threads) as executor:
             futures = [
                 executor.submit(immediate_write_worker, thread_id, writes_per_thread)
                 for thread_id in range(num_threads)
             ]
-            
+
             for future in as_completed(futures):
                 future.result()  # Wait for completion
 
         print(f"Immediate writes: {len(successful_writes)} successful, {len(errors)} errors")
-        
+
         # With BEGIN IMMEDIATE, we should have fewer (ideally zero) database locked errors
         assert len(errors) == 0, f"Expected no 'database is locked' errors, got: {errors}"
         assert len(successful_writes) == num_threads * writes_per_thread
@@ -173,7 +178,9 @@ class TestBeginImmediateSmoke:
 
         # Try to insert duplicate (should fail and rollback)
         with pytest.raises(sqlite3.IntegrityError):
-            execute_immediate("INSERT INTO constraint_test (unique_value) VALUES (?);", ("initial",))
+            execute_immediate(
+                "INSERT INTO constraint_test (unique_value) VALUES (?);", ("initial",)
+            )
 
         # Verify database is in consistent state
         with _get_conn() as conn:
@@ -208,7 +215,9 @@ class TestBeginImmediateSmoke:
             """Worker that performs write operations."""
             try:
                 for i in range(5):
-                    execute_immediate("INSERT INTO mixed_test (value) VALUES (?);", (worker_id * 100 + i,))
+                    execute_immediate(
+                        "INSERT INTO mixed_test (value) VALUES (?);", (worker_id * 100 + i,)
+                    )
                     time.sleep(0.002)
             except Exception as e:
                 errors.append(f"Writer {worker_id}: {e}")
@@ -216,15 +225,15 @@ class TestBeginImmediateSmoke:
         # Run mixed workload
         with ThreadPoolExecutor(max_workers=6) as executor:
             futures = []
-            
+
             # Start 3 readers
             for i in range(3):
                 futures.append(executor.submit(reader_worker, i))
-            
+
             # Start 3 writers
             for i in range(3):
                 futures.append(executor.submit(writer_worker, i))
-            
+
             for future in as_completed(futures):
                 future.result()
 
@@ -240,5 +249,3 @@ class TestBeginImmediateSmoke:
 if __name__ == "__main__":
     # Run smoke test standalone
     pytest.main([__file__, "-v", "-s"])
-
-

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta, timezone
 from typing import Any
-import json
 
 from .session import execute, fetchone
 
@@ -118,7 +118,10 @@ def add_warn_and_maybe_ban(user_id: int, chat_id: int) -> tuple[int, int, bool]:
     banned = state["warns_24h"] >= threshold
     return int(state["warns_24h"]), threshold, banned
 
-def upsert_chat(chat_id: int, title: str | None, chat_type: str | None, locale: str | None, enabled: bool) -> None:
+
+def upsert_chat(
+    chat_id: int, title: str | None, chat_type: str | None, locale: str | None, enabled: bool
+) -> None:
     execute(
         """
         INSERT INTO chats (id, title, type, enabled, locale, created_at)
@@ -130,7 +133,9 @@ def upsert_chat(chat_id: int, title: str | None, chat_type: str | None, locale: 
 
 
 def get_chat(chat_id: int) -> dict[str, Any] | None:
-    return fetchone("SELECT id, title, type, enabled, locale, created_at FROM chats WHERE id = ?", (chat_id,))
+    return fetchone(
+        "SELECT id, title, type, enabled, locale, created_at FROM chats WHERE id = ?", (chat_id,)
+    )
 
 
 def get_chat_settings(chat_id: int) -> dict[str, Any] | None:
@@ -185,6 +190,7 @@ def upsert_chat_settings(chat_id: int, values: dict[str, Any]) -> None:
 
 # --- AI usage (monthly per chat) ---
 
+
 def _period_now() -> str:
     dt = datetime.utcnow()
     return dt.strftime("%Y-%m")
@@ -206,9 +212,3 @@ def ai_get_usage(chat_id: int, period: str | None = None) -> int:
     p = period or _period_now()
     row = fetchone("SELECT ai_calls FROM ai_usage WHERE chat_id = ? AND period = ?", (chat_id, p))
     return int((row or {}).get("ai_calls") or 0)
-
-
-
-
-
-

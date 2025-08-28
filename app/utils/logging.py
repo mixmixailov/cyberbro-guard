@@ -1,16 +1,19 @@
 from __future__ import annotations
 
+import contextvars
 import json
 import logging
 import re
 from datetime import datetime, timezone
 from typing import Any
-import contextvars
-
 
 # Correlation context
-request_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar("request_id", default=None)
-update_id_var: contextvars.ContextVar[int | None] = contextvars.ContextVar("update_id", default=None)
+request_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "request_id", default=None
+)
+update_id_var: contextvars.ContextVar[int | None] = contextvars.ContextVar(
+    "update_id", default=None
+)
 chat_id_var: contextvars.ContextVar[int | None] = contextvars.ContextVar("chat_id", default=None)
 user_id_var: contextvars.ContextVar[int | None] = contextvars.ContextVar("user_id", default=None)
 
@@ -66,43 +69,3 @@ def install_json_logging(debug: bool = False) -> None:
     root = logging.getLogger()
     root.handlers = [handler]
     root.setLevel(logging.DEBUG if debug else logging.INFO)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

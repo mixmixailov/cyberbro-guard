@@ -9,7 +9,6 @@ import yaml
 
 from app.config import get_settings
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -48,6 +47,3 @@ def t(key: str, lang: str | None = None, **kwargs: Any) -> str:
         return text.format(**kwargs)
     except Exception:
         return text
-
-
-

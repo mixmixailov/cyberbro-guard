@@ -1,8 +1,10 @@
 import logging
+
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 
 logger = logging.getLogger(__name__)
+
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Простая проверка, что бот жив."""

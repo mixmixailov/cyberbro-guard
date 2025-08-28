@@ -1,4 +1,5 @@
 import json
+
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -51,5 +52,3 @@ def test_webhook_secret_enabled_requires_header(monkeypatch):
     )
     assert resp2.status_code == 200
     assert resp2.json().get("ok") is True
-
-

@@ -1,23 +1,22 @@
 from __future__ import annotations
 
-import logging
-from typing import Final
 import asyncio
 import json
+import logging
+from typing import Final
 
 from telegram import LabeledPrice, SuccessfulPayment, Update
 from telegram.ext import ContextTypes
 
 from app.config import get_settings
-from app.db.payments import record_payment, seen_charge_id
-from app.db.subscriptions import ensure_plan, upsert_subscription
-from app.db.queries import upgrade_user_to_pro
-from app.db.support import create_ticket, get_last_success_payment
 from app.db.payment_audit import log_action
+from app.db.payments import record_payment, seen_charge_id
+from app.db.queries import upgrade_user_to_pro
+from app.db.subscriptions import ensure_plan, upsert_subscription
+from app.db.support import create_ticket, get_last_success_payment
 from app.metrics import payments_total
 from app.services.idempotency import IdempotencyStore, make_key
 from app.services.idempotency_guard import with_idempotency
-
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +60,9 @@ async def send_pro_invoice(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             last_err = exc
             await asyncio.sleep(0.3)
     if last_err is not None:
-        logger.error("send_invoice failed after retries uid=%s err=%s", getattr(user, "id", None), last_err)
+        logger.error(
+            "send_invoice failed after retries uid=%s err=%s", getattr(user, "id", None), last_err
+        )
         try:
             await message.reply_text("Платежи временно недоступны.")
         except Exception:
@@ -83,7 +84,9 @@ async def send_pro_invoice(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         try:
             for admin_id in list(get_settings().ADMIN_IDS):
                 try:
-                    await context.bot.send_message(int(admin_id), "Invoice send failed (Stars). Check logs.")
+                    await context.bot.send_message(
+                        int(admin_id), "Invoice send failed (Stars). Check logs."
+                    )
                 except Exception:
                     continue
         except Exception:
@@ -99,7 +102,9 @@ async def handle_pre_checkout(update: Update, context: ContextTypes.DEFAULT_TYPE
     try:
         await q.answer(ok=True)
     except Exception as exc:  # noqa: BLE001
-        logger.error("pre_checkout error uid=%s err=%s", getattr(update.effective_user, "id", None), exc)
+        logger.error(
+            "pre_checkout error uid=%s err=%s", getattr(update.effective_user, "id", None), exc
+        )
 
 
 async def handle_successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -113,7 +118,12 @@ async def handle_successful_payment(update: Update, context: ContextTypes.DEFAUL
         return
     # Idempotency on payment charge id
     store = IdempotencyStore()
-    pkey = make_key("payment", str(charge_id or "")) if charge_id else make_key("payment", f"{uid}:{int(sp.total_amount)}:{sp.currency}")
+    pkey = (
+        make_key("payment", str(charge_id or ""))
+        if charge_id
+        else make_key("payment", f"{uid}:{int(sp.total_amount)}:{sp.currency}")
+    )
+
     async def _process() -> None:
         payment_id = 0
         try:
@@ -131,12 +141,15 @@ async def handle_successful_payment(update: Update, context: ContextTypes.DEFAUL
             payments_total.labels("ok").inc()
         except Exception as exc:  # noqa: BLE001
             logger.error("record_payment error uid=%s err=%s", uid, exc)
+
     # Upgrade subscription
     async def _activate() -> None:
         try:
             s = get_settings()
             upsert_subscription(uid, PLAN_CODE, int(s.PRO_PERIOD_DAYS))
-            await context.application.run_in_threadpool(upgrade_user_to_pro, uid, int(s.PRO_PERIOD_DAYS))
+            await context.application.run_in_threadpool(
+                upgrade_user_to_pro, uid, int(s.PRO_PERIOD_DAYS)
+            )
             try:
                 await msg.reply_text(
                     f"Квитанция: план PRO, сумма {int(sp.total_amount)} {sp.currency}, срок {get_settings().PRO_PERIOD_DAYS} дней."
@@ -155,7 +168,7 @@ async def refund_last(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     user = update.effective_user
     if not (message and user):
         return
-    s = get_settings()
+    get_settings()
     uid = int(user.id)
     # fetch last successful payment
     row = get_last_success_payment(uid)
@@ -166,7 +179,7 @@ async def refund_last(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         raw = row.get("raw_json") or "{}"
         data = json.loads(raw)
         charge_id = data.get("telegram_payment_charge_id")
-        provider_charge_id = data.get("provider_payment_charge_id")
+        data.get("provider_payment_charge_id")
         if not charge_id:
             await message.reply_text("Чек недоступен для рефанда.")
             return
@@ -176,15 +189,20 @@ async def refund_last(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             # try integer seconds first (Bot API messages often have date)
             if isinstance(created_at, int):
                 from datetime import datetime, timezone
+
                 ts = datetime.fromtimestamp(created_at, tz=timezone.utc)
             else:
                 from datetime import datetime
+
                 ts = datetime.fromisoformat(str(created_at)) if created_at else None
         except Exception:
             ts = None  # type: ignore[assignment]
         if ts is not None:
-            from datetime import datetime, timezone, timedelta
-            if datetime.now(timezone.utc) - ts > timedelta(hours=int(get_settings().REFUND_WINDOW_H)):
+            from datetime import datetime, timedelta, timezone
+
+            if datetime.now(timezone.utc) - ts > timedelta(
+                hours=int(get_settings().REFUND_WINDOW_H)
+            ):
                 await message.reply_text("Срок для возврата истёк.")
                 return
         # Create support ticket and inform user
@@ -194,9 +212,9 @@ async def refund_last(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             await message.reply_text("Запрос на возврат Stars отправлен. Ожидайте уведомления.")
         except Exception as exc:  # noqa: BLE001
             logger.error("refund api error uid=%s err=%s", uid, exc)
-            await message.reply_text("Не удалось инициировать возврат. Мы уже получили тикет и разберёмся.")
+            await message.reply_text(
+                "Не удалось инициировать возврат. Мы уже получили тикет и разберёмся."
+            )
     except Exception as exc:  # noqa: BLE001
         logger.error("refund parse error uid=%s err=%s", uid, exc)
         await message.reply_text("Ошибка обработки последнего платежа.")
-
-

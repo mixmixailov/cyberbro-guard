@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from logging.config import dictConfig
+
 from app.utils.logging import install_json_logging
 
 
@@ -12,9 +12,3 @@ def setup_logging(debug: bool = False) -> None:
     if not debug:
         logging.getLogger("uvicorn.error").setLevel(logging.INFO)
         logging.getLogger("uvicorn.access").setLevel(logging.INFO)
-
-
-
-
-
-

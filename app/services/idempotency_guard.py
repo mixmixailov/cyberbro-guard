@@ -7,7 +7,6 @@ from prometheus_client import Counter, Histogram
 
 from app.services.idempotency import IdempotencyStore
 
-
 idmp_acquire_total = Counter(
     "cyberbro_idmp_acquire_total",
     "Idempotency acquire results",
@@ -20,7 +19,9 @@ idmp_handler_seconds = Histogram(
 )
 
 
-async def with_idempotency(key: str, handler: Callable[[], Awaitable[Any]], store: IdempotencyStore | None = None) -> Any:
+async def with_idempotency(
+    key: str, handler: Callable[[], Awaitable[Any]], store: IdempotencyStore | None = None
+) -> Any:
     s = store or IdempotencyStore()
     result = s.begin(key)
     idmp_acquire_total.labels(result).inc()
@@ -40,8 +41,3 @@ async def with_idempotency(key: str, handler: Callable[[], Awaitable[Any]], stor
         raise
     finally:
         idmp_handler_seconds.observe(time.perf_counter() - start)
-
-
-
-
-

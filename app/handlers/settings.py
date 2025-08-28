@@ -1,26 +1,31 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
+from telegram.ext import (
+    Application,
+    CallbackQueryHandler,
+    CommandHandler,
+    ContextTypes,
+    MessageHandler,
+    filters,
+)
 
+from app.db.chat_settings import get_effective_settings, set_settings
+from app.services.payments import send_pro_invoice
 from app.utils.admin import admin_required
-from app.utils.lang import t
 from app.utils.callbacks import (
     CBPrefix,
-    build_settings_toggle,
     build_settings_adjust,
-    build_settings_set,
     build_settings_allowlist,
+    build_settings_info,
+    build_settings_set,
+    build_settings_toggle,
     parse_callback,
 )
+from app.utils.lang import t
 from app.utils.sender import send_text
-from app.services.payments import send_pro_invoice
-from app.db.chat_settings import get_effective_settings, set_settings
-from app.db.queries import get_chat
-
 
 logger = logging.getLogger(__name__)
 
@@ -39,24 +44,60 @@ SET_KEYS_NUM = [
 def _menu(chat_id: int) -> InlineKeyboardMarkup:
     s = get_effective_settings(chat_id)
     rows = []
-    rows.append([InlineKeyboardButton(text=f"Moderation: {'ON' if s else 'OFF'}", callback_data=build_settings_toggle("enabled", True))])
-    rows.append([InlineKeyboardButton(text=f"Welcome: {'ON' if s.get('welcome_enabled', 1) else 'OFF'}", callback_data=build_settings_toggle("welcome_enabled", not s.get("welcome_enabled", 1)))])
+    rows.append(
+        [
+            InlineKeyboardButton(
+                text=f"Moderation: {'ON' if s else 'OFF'}",
+                callback_data=build_settings_toggle("enabled", True),
+            )
+        ]
+    )
+    rows.append(
+        [
+            InlineKeyboardButton(
+                text=f"Welcome: {'ON' if s.get('welcome_enabled', 1) else 'OFF'}",
+                callback_data=build_settings_toggle(
+                    "welcome_enabled", not s.get("welcome_enabled", 1)
+                ),
+            )
+        ]
+    )
     for env_key, db_key, step in SET_KEYS_NUM:
-        rows.append([
-            InlineKeyboardButton(text=f"{env_key}: {s.get(db_key)}", callback_data=build_settings_set(db_key, str(s.get(db_key)))),
-            InlineKeyboardButton(text="-", callback_data=build_settings_adjust(db_key, "dec", step)),
-            InlineKeyboardButton(text="+", callback_data=build_settings_adjust(db_key, "inc", step)),
-        ])
-    rows.append([
-        InlineKeyboardButton(text=f"LINK_POLICY: {s.get('link_policy')}", callback_data=build_settings_set("link_policy", s.get("link_policy", "restricted"))),
-    ])
-    rows.append([
-        InlineKeyboardButton(text="Allowlist links", callback_data=build_settings_allowlist()),
-    ])
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=f"{env_key}: {s.get(db_key)}",
+                    callback_data=build_settings_set(db_key, str(s.get(db_key))),
+                ),
+                InlineKeyboardButton(
+                    text="-", callback_data=build_settings_adjust(db_key, "dec", step)
+                ),
+                InlineKeyboardButton(
+                    text="+", callback_data=build_settings_adjust(db_key, "inc", step)
+                ),
+            ]
+        )
+    rows.append(
+        [
+            InlineKeyboardButton(
+                text=f"LINK_POLICY: {s.get('link_policy')}",
+                callback_data=build_settings_set("link_policy", s.get("link_policy", "restricted")),
+            ),
+        ]
+    )
+    rows.append(
+        [
+            InlineKeyboardButton(text="Allowlist links", callback_data=build_settings_allowlist()),
+        ]
+    )
     # Moderation reasons preview (localized keys)
-    rows.append([
-        InlineKeyboardButton(text="Reasons: spam/toxic/nsfw", callback_data=build_settings_info()),
-    ])
+    rows.append(
+        [
+            InlineKeyboardButton(
+                text="Reasons: spam/toxic/nsfw", callback_data=build_settings_info()
+            ),
+        ]
+    )
     return InlineKeyboardMarkup(rows)
 
 
@@ -74,8 +115,9 @@ async def settings_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Rate limit abuse for callbacks on settings too
     try:
-        from app.main import callback_bucket
         from app.config import get_settings
+        from app.main import callback_bucket
+
         scope = get_settings().RATE_LIMIT_SCOPE
         uid = int(getattr(update.effective_user, "id", 0) or 0)
         chat_id = int(getattr(update.effective_chat, "id", 0) or 0)
@@ -105,14 +147,22 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             feature, val = parts[1], parts[2]
             if feature == "enabled":
                 from app.db.queries import upsert_chat
-                await context.application.run_in_threadpool(upsert_chat, chat.id, getattr(chat, "title", None), chat.type, None, bool(int(val)))
+
+                await context.application.run_in_threadpool(
+                    upsert_chat,
+                    chat.id,
+                    getattr(chat, "title", None),
+                    chat.type,
+                    None,
+                    bool(int(val)),
+                )
             else:
                 set_settings(chat.id, {feature: int(val)})
         elif action == "adj" and len(parts) >= 4:
             key, op, step = parts[1], parts[2], int(parts[3])
             current = get_effective_settings(chat.id).get(key)
             if isinstance(current, int):
-                set_settings(chat.id, {key: max(0, current + (step if op == 'inc' else -step))})
+                set_settings(chat.id, {key: max(0, current + (step if op == "inc" else -step))})
         elif action == "set" and len(parts) >= 3:
             key, value = parts[1], parts[2]
             set_settings(chat.id, {key: value})
@@ -185,8 +235,3 @@ def register(app: Application) -> None:
         await update.effective_message.reply_text("Allowlist updated.")
 
     app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.GROUPS, on_text))
-
-
-
-
-

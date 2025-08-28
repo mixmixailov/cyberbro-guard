@@ -4,11 +4,9 @@ import logging
 import time
 
 from prometheus_client import Histogram
-from app.metrics import sched_runs_total, sched_errors_total
 
+from app.metrics import idmp_purged_total, sched_errors_total, sched_runs_total
 from app.services.idempotency import IdempotencyStore
-from app.metrics import idmp_purged_total
-
 
 logger = logging.getLogger(__name__)
 
@@ -32,5 +30,3 @@ def run_purge_job() -> None:
         logger.error("idmp purge error: %s", exc)
     finally:
         purge_seconds.observe(time.perf_counter() - start)
-
-

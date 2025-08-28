@@ -1,37 +1,43 @@
-import logging
 import asyncio
+import logging
 import os
 from collections import deque
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, Header
+
+from fastapi import FastAPI, Header, Request
 from fastapi.responses import JSONResponse
-from starlette.requests import ClientDisconnect
 from telegram import Update
 from telegram.ext import Application
+
+from .admin import router as admin_router
 from .config import get_settings
-from .handlers import setup_handlers
-from .logging_conf import setup_logging
-from .middleware.correlation import CorrelationMiddleware
-from .utils.logging import set_update_context
 from .db import init_db
 from .db.session import execute as db_execute
+from .handlers import setup_handlers
 from .health import router as health_router
-from .metrics import router as metrics_router
-from .admin import router as admin_router
-from .metrics import attach_exporter
-from .metrics import updates_total, webhook_dropped_total, webhook_errors_total, webhook_latency_seconds, timeit, sched_runs_total, sched_errors_total
+from .logging_conf import setup_logging
+from .metrics import (
+    attach_exporter,
+    timeit,
+    updates_total,
+    webhook_dropped_total,
+    webhook_errors_total,
+    webhook_latency_seconds,
+)
+from .middleware.correlation import CorrelationMiddleware
+from .sched.idempotency_purge import run_purge_job
+from .sched.ratelimit_cleanup import run_cleanup_job
+from .services.dlq import add_failed_update_to_dlq
 from .services.idempotency import IdempotencyStore, make_key
 from .services.idempotency_guard import with_idempotency
-from .utils.security import verify_secret
-from .services.rate_limit import TokenBucket
-from .services.rate_limits import init_rate_limit_service, get_rate_limit_service
-from .sched.ratelimit_cleanup import run_cleanup_job
-from .utils.scheduler import Scheduler
-from .services.subscriptions import run_reminders, expire_due, cleanup_old_data
-from .services.send_queue import SendQueue
-from .services.dlq import add_failed_update_to_dlq
 from .services.maintenance import MaintenanceService
-from .sched.idempotency_purge import run_purge_job
+from .services.rate_limit import TokenBucket
+from .services.rate_limits import init_rate_limit_service
+from .services.send_queue import SendQueue
+from .services.subscriptions import cleanup_old_data, expire_due, run_reminders
+from .utils.logging import set_update_context
+from .utils.scheduler import Scheduler
+from .utils.security import verify_secret
 
 logger = logging.getLogger(__name__)
 
@@ -82,36 +88,44 @@ async def lifespan(app: FastAPI):
     logger.info("Service starting...")
     # Secrets sanity
     if not settings.WEBHOOK_SECRET:
-        logger.warning("WEBHOOK_SECRET is empty; callback signatures will be weak. Set WEBHOOK_SECRET.")
+        logger.warning(
+            "WEBHOOK_SECRET is empty; callback signatures will be weak. Set WEBHOOK_SECRET."
+        )
     # Init DB (DDL only, no migrations yet) — sync, run in thread
     await asyncio.to_thread(init_db)
     # Optional forward-only migrations
     if settings.AUTO_MIGRATE:
         try:
             from pathlib import Path
+
             from .utils.migrate import migrate as run_migrate
+
             project_root = Path(__file__).resolve().parents[1]
             migrations_dir = str(project_root / "db" / "migrations")
             await asyncio.to_thread(run_migrate, migrations_dir)
         except Exception as exc:  # noqa: BLE001
             logger.error("AUTO_MIGRATE failed: %s", exc)
     # Log env file resolution and critical env values
-    logger.info("Config snapshot: BOT_TOKEN=%s, PUBLIC_BASE=%s, DEBUG=%s",
-                "***SET***" if bool(settings.BOT_TOKEN) else "<EMPTY>",
-                bool(settings.PUBLIC_BASE),
-                settings.DEBUG)
+    logger.info(
+        "Config snapshot: BOT_TOKEN=%s, PUBLIC_BASE=%s, DEBUG=%s",
+        "***SET***" if bool(settings.BOT_TOKEN) else "<EMPTY>",
+        bool(settings.PUBLIC_BASE),
+        settings.DEBUG,
+    )
     if not settings.BOT_TOKEN:
-        logger.error("BOT_TOKEN пуст. HTTP-сервер стартует, но бот не активен. Укажи BOT_TOKEN в переменных окружения.")
+        logger.error(
+            "BOT_TOKEN пуст. HTTP-сервер стартует, но бот не активен. Укажи BOT_TOKEN в переменных окружения."
+        )
         application = None
     else:
         # Configure application with custom API base for testing
         app_builder = Application.builder().token(settings.BOT_TOKEN)
-        
+
         # Use custom Telegram API base URL if specified (for testing)
         if settings.TELEGRAM_API_BASE != "https://api.telegram.org":
             logger.info("Using custom Telegram API base: %s", settings.TELEGRAM_API_BASE)
             app_builder = app_builder.base_url(settings.TELEGRAM_API_BASE)
-        
+
         application = app_builder.build()
         await application.initialize()
         setup_handlers(application)
@@ -140,7 +154,7 @@ async def lifespan(app: FastAPI):
             logger.info("SendQueue started")
         except Exception as exc:  # noqa: BLE001
             logger.error("SendQueue start failed: %s", exc)
-            
+
         # Initialize maintenance service
         try:
             global maintenance_service
@@ -152,26 +166,29 @@ async def lifespan(app: FastAPI):
         # Start polling if enabled
         global update_queue, worker_task
         if settings.USE_POLLING:
+
             async def _polling() -> None:
                 assert application is not None
                 try:
                     await application.run_polling(allowed_updates=list(settings.ALLOWED_UPDATES))
                 except Exception as exc:  # noqa: BLE001
                     logger.error("polling error: %s", exc, exc_info=True)
+
             worker_task = asyncio.create_task(_polling())
         else:
             # Create background worker queue and task for webhook mode
             update_queue = asyncio.Queue(maxsize=1000)
+
             async def _worker() -> None:
                 assert application is not None
                 max_attempts = 3  # Max retry attempts before moving to DLQ
-                
+
                 while True:
                     upd = await update_queue.get()
                     try:
                         attempt_count = 0
                         last_error = None
-                        
+
                         # Retry loop with DLQ fallback
                         while attempt_count < max_attempts:
                             attempt_count += 1
@@ -190,27 +207,33 @@ async def lifespan(app: FastAPI):
                                 await application.process_update(upd)
                             # Success - break out of retry loop
                             break
-                            
+
                         except Exception as exc:  # noqa: BLE001
                             last_error = exc
                             logger.warning(
-                                "Update processing failed (attempt %d/%d): %s", 
-                                attempt_count, max_attempts, exc,
+                                "Update processing failed (attempt %d/%d): %s",
+                                attempt_count,
+                                max_attempts,
+                                exc,
                                 extra={
                                     "update_id": getattr(upd, "update_id", None),
                                     "attempt": attempt_count,
-                                    "max_attempts": max_attempts
-                                }
+                                    "max_attempts": max_attempts,
+                                },
                             )
-                            
+
                             # If this was the last attempt, move to DLQ
                             if attempt_count >= max_attempts:
                                 try:
-                                    update_data = upd.to_dict() if hasattr(upd, "to_dict") else {"update": str(upd)}
+                                    update_data = (
+                                        upd.to_dict()
+                                        if hasattr(upd, "to_dict")
+                                        else {"update": str(upd)}
+                                    )
                                     dlq_id = add_failed_update_to_dlq(
                                         update_data=update_data,
                                         error=last_error,
-                                        attempts=attempt_count
+                                        attempts=attempt_count,
                                     )
                                     logger.error(
                                         "Update moved to DLQ after %d failed attempts",
@@ -218,8 +241,8 @@ async def lifespan(app: FastAPI):
                                         extra={
                                             "dlq_id": dlq_id,
                                             "update_id": getattr(upd, "update_id", None),
-                                            "error": str(last_error)
-                                        }
+                                            "error": str(last_error),
+                                        },
                                     )
                                 except Exception as dlq_error:  # noqa: BLE001
                                     logger.error("Failed to add update to DLQ: %s", dlq_error)
@@ -229,6 +252,7 @@ async def lifespan(app: FastAPI):
                                 await asyncio.sleep(wait_time)
                     finally:
                         update_queue.task_done()
+
             worker_task = asyncio.create_task(_worker())
 
     logger.info("Service ready.")
@@ -243,6 +267,7 @@ async def lifespan(app: FastAPI):
                 main_loop = asyncio.get_running_loop()
             except RuntimeError:
                 main_loop = None
+
             # async job: submit to main loop from scheduler thread
             def _run_reminders_job() -> None:
                 try:
@@ -250,26 +275,39 @@ async def lifespan(app: FastAPI):
                         asyncio.run_coroutine_threadsafe(run_reminders(application), main_loop)
                 except Exception as exc:  # noqa: BLE001
                     logger.error("reminders submit error: %s", exc)
-            scheduler_ref.add_cron(_run_reminders_job, settings.SCHED_CRON_REMINDERS, name="renewal_reminders")  # type: ignore[arg-type]
+
+            scheduler_ref.add_cron(
+                _run_reminders_job, settings.SCHED_CRON_REMINDERS, name="renewal_reminders"
+            )  # type: ignore[arg-type]
             # sync jobs: call directly in scheduler thread
-            scheduler_ref.add_cron(expire_due, settings.SCHED_CRON_EXPIRE, name="expire_subscriptions")
-            scheduler_ref.add_cron(cleanup_old_data, settings.SCHED_CRON_CLEANUP, name="cleanup_old_data")
+            scheduler_ref.add_cron(
+                expire_due, settings.SCHED_CRON_EXPIRE, name="expire_subscriptions"
+            )
+            scheduler_ref.add_cron(
+                cleanup_old_data, settings.SCHED_CRON_CLEANUP, name="cleanup_old_data"
+            )
             scheduler_ref.add_cron(run_purge_job, "*/10 * * * *", name="idmp_purge")
             scheduler_ref.start()
         # Initialize adaptive rate limit service
         await init_rate_limit_service()
         logger.info("Adaptive rate limit service initialized")
-        
+
         # Initialize callback rate limit bucket (legacy - will be replaced by adaptive service)
         global callback_bucket
         callback_bucket = TokenBucket(rate=6, per=10.0, burst=6.0, cool_down=15.0)
         if scheduler_ref:
-            scheduler_ref.add_cron(lambda: run_cleanup_job(callback_bucket, 10.0), "*/1 * * * *", name="ratelimit_cleanup")
+            scheduler_ref.add_cron(
+                lambda: run_cleanup_job(callback_bucket, 10.0),
+                "*/1 * * * *",
+                name="ratelimit_cleanup",
+            )
         # Optional: self-test reply to admin to verify pipeline end-to-end
         try:
             if settings.WEBHOOK_FORCE_REPLY_TEST and application is not None and settings.ADMIN_IDS:
                 admin_id = next(iter(settings.ADMIN_IDS))
-                await application.bot.send_message(chat_id=admin_id, text="CyberBro Guard: self-test ping")
+                await application.bot.send_message(
+                    chat_id=admin_id, text="CyberBro Guard: self-test ping"
+                )
                 logger.info("Self-test message sent to admin_id=%s", admin_id)
         except Exception as exc:  # noqa: BLE001
             logger.error("self-test send failed: %s", exc)
@@ -311,6 +349,7 @@ app.add_middleware(CorrelationMiddleware)
 attach_exporter(app)
 app.include_router(admin_router)
 
+
 @timeit(webhook_latency_seconds, "updates")
 @app.post("/webhook")
 async def telegram_webhook(
@@ -323,7 +362,12 @@ async def telegram_webhook(
     global application
 
     try:
-        logger.info("HTTP %s %s hit: ct=%s", request.method, request.url.path, request.headers.get("content-type"))
+        logger.info(
+            "HTTP %s %s hit: ct=%s",
+            request.method,
+            request.url.path,
+            request.headers.get("content-type"),
+        )
         # Проверка секрета вебхука
         settings = get_settings()
         # NOTE: Telegram Bot API: header name is X-Telegram-Bot-Api-Secret-Token (see Bot API docs).
@@ -356,14 +400,30 @@ async def telegram_webhook(
         # Allowed updates filter
         try:
             upd_type = (
-                "message" if "message" in data else (
-                    "edited_message" if "edited_message" in data else (
-                        "callback_query" if "callback_query" in data else (
-                            "chat_member" if "chat_member" in data else (
-                                "my_chat_member" if "my_chat_member" in data else (
-                                    "message_reaction" if "message_reaction" in data else (
-                                        "chat_join_request" if "chat_join_request" in data else (
-                                            "pre_checkout_query" if "pre_checkout_query" in data else "other"
+                "message"
+                if "message" in data
+                else (
+                    "edited_message"
+                    if "edited_message" in data
+                    else (
+                        "callback_query"
+                        if "callback_query" in data
+                        else (
+                            "chat_member"
+                            if "chat_member" in data
+                            else (
+                                "my_chat_member"
+                                if "my_chat_member" in data
+                                else (
+                                    "message_reaction"
+                                    if "message_reaction" in data
+                                    else (
+                                        "chat_join_request"
+                                        if "chat_join_request" in data
+                                        else (
+                                            "pre_checkout_query"
+                                            if "pre_checkout_query" in data
+                                            else "other"
                                         )
                                     )
                                 )
@@ -389,15 +449,27 @@ async def telegram_webhook(
             pass
         # Ограничение длины текста/подписи
         try:
-            if update is not None and update.message and update.message.text and len(update.message.text) > 4096:
+            if (
+                update is not None
+                and update.message
+                and update.message.text
+                and len(update.message.text) > 4096
+            ):
                 update.message.text = update.message.text[:4096]
-            if update is not None and update.message and update.message.caption and len(update.message.caption) > 4096:
+            if (
+                update is not None
+                and update.message
+                and update.message.caption
+                and len(update.message.caption) > 4096
+            ):
                 update.message.caption = update.message.caption[:4096]
         except Exception:
             pass
         # Idempotency guard
         try:
-            if is_duplicate_update(getattr(update, "update_id", None) if update is not None else data.get("update_id")):
+            if is_duplicate_update(
+                getattr(update, "update_id", None) if update is not None else data.get("update_id")
+            ):
                 webhook_dropped_total.labels("duplicate").inc()
                 return {"ok": True}
         except Exception:
@@ -412,13 +484,26 @@ async def telegram_webhook(
             pass
         # Log update meta
         try:
-            uid = getattr(update, "update_id", None) if update is not None else data.get("update_id")
+            uid = (
+                getattr(update, "update_id", None) if update is not None else data.get("update_id")
+            )
             logger.info("update meta: id=%s type=%s", uid, upd_type)
         except Exception:
             pass
         # Idempotency persisted; enqueue to background worker queue (if PTB ready)
         store = IdempotencyStore()
-        ukey = make_key("update", str((getattr(update, "update_id", None) if update is not None else data.get("update_id")) or "0"))
+        ukey = make_key(
+            "update",
+            str(
+                (
+                    getattr(update, "update_id", None)
+                    if update is not None
+                    else data.get("update_id")
+                )
+                or "0"
+            ),
+        )
+
         async def enqueue() -> None:
             global update_queue, application
             # If queue exists (webhook mode) → enqueue; otherwise process directly in background
@@ -437,24 +522,36 @@ async def telegram_webhook(
             # No queue (likely polling mode set by mistake with webhook) → process via task
             if application is not None:
                 tmo = float(get_settings().WEBHOOK_HANDLE_TIMEOUT_S)
+
                 async def _proc() -> None:
                     try:
                         async with asyncio.timeout(tmo):
                             await application.process_update(update)
                     except Exception as exc:  # noqa: BLE001
                         logger.error("direct process_update error: %s", exc, exc_info=True)
+
                 asyncio.create_task(_proc())
+
         await with_idempotency(ukey, enqueue, store)
-        logger.info("HTTP %s %s ack 200: len=%s keys=%s", request.method, request.url.path, len(body), list(data.keys()))
+        logger.info(
+            "HTTP %s %s ack 200: len=%s keys=%s",
+            request.method,
+            request.url.path,
+            len(body),
+            list(data.keys()),
+        )
         # Extended diagnostics only when DEBUG enabled
         if settings.DEBUG:
             try:
                 upd_type = (
-                    "message" if "message" in data else (
-                        "callback_query" if "callback_query" in data else "other"
-                    )
+                    "message"
+                    if "message" in data
+                    else ("callback_query" if "callback_query" in data else "other")
                 )
-                uid = ((data.get("message") or {}).get("from", {}) or (data.get("callback_query") or {}).get("from", {})).get("id")
+                uid = (
+                    (data.get("message") or {}).get("from", {})
+                    or (data.get("callback_query") or {}).get("from", {})
+                ).get("id")
                 text = None
                 if update is not None and update.message and update.message.text:
                     text = update.message.text
@@ -480,7 +577,10 @@ async def status():
     if settings.DEBUG:
         logger.debug("/status called")
     if not settings.BOT_TOKEN:
-        return JSONResponse({"running": False, "public_base": bool(settings.PUBLIC_BASE), "debug": settings.DEBUG}, status_code=503)
+        return JSONResponse(
+            {"running": False, "public_base": bool(settings.PUBLIC_BASE), "debug": settings.DEBUG},
+            status_code=503,
+        )
     global application
     try:
         if application is not None:
@@ -488,15 +588,20 @@ async def status():
             webhook_url = info.url if info else None
         else:
             webhook_url = None
-        return JSONResponse({
-            "running": application is not None,
-            "public_base": bool(settings.PUBLIC_BASE),
-            "debug": settings.DEBUG,
-            "webhook": webhook_url,
-        })
+        return JSONResponse(
+            {
+                "running": application is not None,
+                "public_base": bool(settings.PUBLIC_BASE),
+                "debug": settings.DEBUG,
+                "webhook": webhook_url,
+            }
+        )
     except Exception as exc:  # noqa: BLE001
         logger.error("/status error: %s", exc)
-        return JSONResponse({"running": False, "public_base": bool(settings.PUBLIC_BASE), "debug": settings.DEBUG}, status_code=503)
+        return JSONResponse(
+            {"running": False, "public_base": bool(settings.PUBLIC_BASE), "debug": settings.DEBUG},
+            status_code=503,
+        )
 
 
 @app.get("/db_health")

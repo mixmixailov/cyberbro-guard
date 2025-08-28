@@ -22,8 +22,3 @@ def test_verify_v1_ttl_fail(monkeypatch):
     expired = ":".join(parts)
     ok, _ = verify_v1(expired)
     assert not ok
-
-
-
-
-

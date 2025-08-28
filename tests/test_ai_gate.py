@@ -1,8 +1,8 @@
 import asyncio
 from types import SimpleNamespace
 
+from app.metrics import generate_latest, registry
 from app.services.moderation import ModerationService
-from app.metrics import registry, generate_latest
 
 
 class StubProvider:
@@ -78,7 +78,7 @@ def test_ai_free_user_skips(monkeypatch):
     assert prov.calls == 0
     # metrics contain skipped reason
     out = generate_latest(registry).decode("utf-8")
-    assert "cyberbro_ai_skipped_total" in out and "reason=\"not_pro\"" in out
+    assert "cyberbro_ai_skipped_total" in out and 'reason="not_pro"' in out
 
 
 def test_ai_disabled_behaves_as_before(monkeypatch):
@@ -96,8 +96,3 @@ def test_ai_disabled_behaves_as_before(monkeypatch):
     # Should run without invoking provider
     asyncio.run(svc.on_message(upd, ctx))
     assert prov.calls == 0
-
-
-
-
-

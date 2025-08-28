@@ -21,9 +21,3 @@ CREATE TABLE IF NOT EXISTS payments (
     raw_json TEXT
 );
 """
-
-
-
-
-
-

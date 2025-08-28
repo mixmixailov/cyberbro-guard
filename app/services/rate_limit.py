@@ -6,7 +6,6 @@ from typing import Dict, Tuple
 
 from prometheus_client import Counter, Gauge
 
-
 abuse_rate_total = Counter(
     "cyberbro_abuse_rate_limit_total",
     "Rate limit decisions",
@@ -85,8 +84,3 @@ class TokenBucket:
         # recalc gauge
         abuse_muted_gauge.set(sum(1 for e in self._store.values() if e.muted_until > now))
         return len(to_del)
-
-
-
-
-

@@ -45,6 +45,7 @@ def test_half_open_allows_probes_then_closes_on_success(monkeypatch):
 def test_timeout_and_retries_with_jitter(monkeypatch):
     # Seed jitter
     _random.seed(0)
+
     async def slow():
         await asyncio.sleep(0.2)
         return 1
@@ -55,8 +56,3 @@ def test_timeout_and_retries_with_jitter(monkeypatch):
         assert val is None
 
     asyncio.run(run())
-
-
-
-
-

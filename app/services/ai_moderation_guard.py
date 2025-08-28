@@ -5,11 +5,11 @@ import logging
 import random
 import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Awaitable
+from typing import Any, Awaitable, Callable
 
 from prometheus_client import Counter, Gauge
-from app.metrics import ai_latency_seconds
 
+from app.metrics import ai_latency_seconds
 
 logger = logging.getLogger(__name__)
 
@@ -130,8 +130,3 @@ async def call_with_resilience(
 def record_ai_success(latency_start: float) -> None:
     _CB.record_success()
     ai_latency_seconds.observe(time.perf_counter() - latency_start)
-
-
-
-
-

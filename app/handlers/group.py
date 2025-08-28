@@ -4,16 +4,23 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from telegram import Update, ChatPermissions
-from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, ChatMemberHandler, CallbackQueryHandler, filters
+from telegram import ChatPermissions, Update
+from telegram.ext import (
+    Application,
+    CallbackQueryHandler,
+    ChatMemberHandler,
+    CommandHandler,
+    ContextTypes,
+    MessageHandler,
+    filters,
+)
 
 from app.config import get_settings
-from app.db import upsert_chat, upsert_chat_settings, get_chat, get_chat_settings
+from app.db import get_chat, upsert_chat, upsert_chat_settings
 from app.db.queries import add_warn_and_maybe_ban
-from app.utils.lang import t
 from app.services.moderation import ModerationService
+from app.utils.lang import t
 from app.utils.sender import send_text
-
 
 logger = logging.getLogger(__name__)
 
@@ -117,8 +124,9 @@ async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     st = "on" if (data and data.get("enabled")) else "off"
     # recent actions preview not persisted; show effective settings snapshot
     from app.db.chat_settings import get_effective_settings as eff
+
     s = eff(chat.id)
-    lang = getattr(update.effective_user, "language_code", None) or get_settings().DEFAULT_LOCALE
+    getattr(update.effective_user, "language_code", None) or get_settings().DEFAULT_LOCALE
     summary = (
         f"Status: {st}\n"
         f"Flood: {s.get('flood_n')}/{s.get('flood_window_s')}s\n"
@@ -147,8 +155,12 @@ async def warn_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             try:
                 await context.bot.ban_chat_member(chat.id, target, until_date=until)
             except Exception as exc:  # noqa: BLE001
-                logger.error("ban after warn failed: chat=%s target=%s err=%s", chat.id, target, exc)
-            await update.effective_message.reply_text(f"Warns: {new_count}/{threshold}. Banned for {get_settings().BAN_DAYS}d.")
+                logger.error(
+                    "ban after warn failed: chat=%s target=%s err=%s", chat.id, target, exc
+                )
+            await update.effective_message.reply_text(
+                f"Warns: {new_count}/{threshold}. Banned for {get_settings().BAN_DAYS}d."
+            )
         else:
             await update.effective_message.reply_text(f"Warns: {new_count}/{threshold}.")
     except Exception as exc:  # noqa: BLE001
@@ -225,8 +237,13 @@ def register(app: Application) -> None:
 
     # Moderation message and member updates
     service = ModerationService()
-    app.add_handler(MessageHandler(filters.ChatType.GROUPS & (filters.TEXT | filters.CAPTION), service.on_message), group=10)
-    app.add_handler(ChatMemberHandler(service.on_chat_member_update, ChatMemberHandler.CHAT_MEMBER), group=10)
+    app.add_handler(
+        MessageHandler(
+            filters.ChatType.GROUPS & (filters.TEXT | filters.CAPTION), service.on_message
+        ),
+        group=10,
+    )
+    app.add_handler(
+        ChatMemberHandler(service.on_chat_member_update, ChatMemberHandler.CHAT_MEMBER), group=10
+    )
     app.add_handler(CallbackQueryHandler(service.on_callback), group=10)
-
-

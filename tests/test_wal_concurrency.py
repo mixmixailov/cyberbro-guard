@@ -2,16 +2,15 @@
 
 Tests that WAL checkpoints don't block normal database operations.
 """
-import pytest
+
 import asyncio
 import sqlite3
 import tempfile
 import threading
 import time
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from app.db.session import _get_conn, checkpoint_wal, get_wal_info
+import pytest
 
 
 class TestWALConcurrency:
@@ -21,7 +20,7 @@ class TestWALConcurrency:
         """Setup test database for each test."""
         self.temp_dir = tempfile.TemporaryDirectory()
         self.db_path = Path(self.temp_dir.name) / "test_concurrent.db"
-        
+
         # Create test database with WAL mode
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("PRAGMA journal_mode=WAL;")
@@ -44,7 +43,7 @@ class TestWALConcurrency:
         """Test that checkpoint doesn't block concurrent writes."""
         results = []
         checkpoint_result = []
-        
+
         def writer_task(writer_id: int, write_count: int):
             """Write data to database."""
             try:
@@ -52,7 +51,7 @@ class TestWALConcurrency:
                     for i in range(write_count):
                         conn.execute(
                             "INSERT INTO test_data (data) VALUES (?)",
-                            (f"writer_{writer_id}_item_{i}",)
+                            (f"writer_{writer_id}_item_{i}",),
                         )
                         conn.commit()
                         time.sleep(0.001)  # Small delay between writes
@@ -72,28 +71,28 @@ class TestWALConcurrency:
 
         # Start concurrent operations
         threads = []
-        
+
         # Start 3 writer threads
         for i in range(3):
             thread = threading.Thread(target=writer_task, args=(i, 50))
             threads.append(thread)
             thread.start()
-        
+
         # Start checkpoint thread
         checkpoint_thread = threading.Thread(target=checkpoint_task)
         threads.append(checkpoint_thread)
         checkpoint_thread.start()
-        
+
         # Wait for all to complete
         for thread in threads:
             thread.join(timeout=10)
-        
+
         # Verify results
         assert len(results) == 3  # All writers completed
         assert all("completed" in result for result in results)
         assert len(checkpoint_result) == 1  # Checkpoint completed
         assert "success" in checkpoint_result[0]
-        
+
         # Verify data integrity
         with self._get_test_conn() as conn:
             count = conn.execute("SELECT COUNT(*) FROM test_data").fetchone()[0]
@@ -109,7 +108,7 @@ class TestWALConcurrency:
 
         results = []
         checkpoint_result = []
-        
+
         def reader_task(reader_id: int, read_count: int):
             """Read data from database."""
             try:
@@ -134,22 +133,22 @@ class TestWALConcurrency:
 
         # Start concurrent operations
         threads = []
-        
+
         # Start 5 reader threads
         for i in range(5):
             thread = threading.Thread(target=reader_task, args=(i, 100))
             threads.append(thread)
             thread.start()
-        
+
         # Start checkpoint thread
         checkpoint_thread = threading.Thread(target=checkpoint_task)
         threads.append(checkpoint_thread)
         checkpoint_thread.start()
-        
+
         # Wait for completion
         for thread in threads:
             thread.join(timeout=10)
-        
+
         # Verify results
         assert len(results) == 5  # All readers completed
         assert all("completed" in result for result in results)
@@ -159,7 +158,7 @@ class TestWALConcurrency:
     def test_multiple_checkpoints_concurrent(self):
         """Test multiple checkpoint operations running concurrently."""
         results = []
-        
+
         def checkpoint_task(checkpoint_id: int, mode: str):
             """Perform checkpoint with specific mode."""
             try:
@@ -173,16 +172,16 @@ class TestWALConcurrency:
         # Start multiple checkpoint operations with different modes
         threads = []
         modes = ["PASSIVE", "FULL", "RESTART"]
-        
+
         for i, mode in enumerate(modes):
             thread = threading.Thread(target=checkpoint_task, args=(i, mode))
             threads.append(thread)
             thread.start()
-        
+
         # Wait for completion
         for thread in threads:
             thread.join(timeout=5)
-        
+
         # Verify all checkpoints completed (some may be no-ops if WAL is empty)
         assert len(results) == 3
         assert all("error" not in result for result in results)
@@ -197,7 +196,7 @@ class TestWALConcurrency:
             conn.commit()
 
         results = []
-        
+
         async def async_operations():
             """Async operations that might trigger checkpoints."""
             for i in range(10):
@@ -229,10 +228,10 @@ class TestWALConcurrency:
         # Run async and sync operations concurrently
         sync_thread = threading.Thread(target=sync_operations)
         sync_thread.start()
-        
+
         await async_operations()
         sync_thread.join(timeout=5)
-        
+
         # Verify both completed successfully
         assert "async_ops_completed" in results
         assert "sync_ops_completed" in results
@@ -240,7 +239,7 @@ class TestWALConcurrency:
     def test_checkpoint_with_heavy_write_load(self):
         """Test checkpoint under heavy write load."""
         results = []
-        
+
         def heavy_writer(writer_id: int):
             """Write large amounts of data."""
             try:
@@ -250,7 +249,7 @@ class TestWALConcurrency:
                         for i in range(100):
                             conn.execute(
                                 "INSERT INTO test_data (data) VALUES (?)",
-                                (f"heavy_writer_{writer_id}_batch_{batch}_item_{i}",)
+                                (f"heavy_writer_{writer_id}_batch_{batch}_item_{i}",),
                             )
                         conn.commit()
                         time.sleep(0.01)  # Brief pause between batches
@@ -264,7 +263,7 @@ class TestWALConcurrency:
                 for i in range(5):
                     time.sleep(0.05)  # Wait between checkpoints
                     with self._get_test_conn() as conn:
-                        result = conn.execute("PRAGMA wal_checkpoint(TRUNCATE);").fetchone()
+                        conn.execute("PRAGMA wal_checkpoint(TRUNCATE);").fetchone()
                 results.append("periodic_checkpoint_completed")
             except Exception as e:
                 results.append(f"periodic_checkpoint_error: {e}")
@@ -275,20 +274,20 @@ class TestWALConcurrency:
             thread = threading.Thread(target=heavy_writer, args=(i,))
             threads.append(thread)
             thread.start()
-        
+
         # Start periodic checkpoints
         checkpoint_thread = threading.Thread(target=periodic_checkpoint)
         threads.append(checkpoint_thread)
         checkpoint_thread.start()
-        
+
         # Wait for completion
         for thread in threads:
             thread.join(timeout=15)
-        
+
         # Verify all operations completed
         assert len([r for r in results if "heavy_writer" in r and "completed" in r]) == 2
         assert "periodic_checkpoint_completed" in results
-        
+
         # Verify data integrity
         with self._get_test_conn() as conn:
             count = conn.execute("SELECT COUNT(*) FROM test_data").fetchone()[0]
@@ -297,7 +296,7 @@ class TestWALConcurrency:
     def test_checkpoint_error_handling_concurrent(self):
         """Test checkpoint error handling under concurrent conditions."""
         results = []
-        
+
         def corrupt_database():
             """Simulate database corruption or locking issues."""
             try:
@@ -325,19 +324,16 @@ class TestWALConcurrency:
         # Run concurrent operations that might conflict
         corruption_thread = threading.Thread(target=corrupt_database)
         checkpoint_thread = threading.Thread(target=checkpoint_with_conflict)
-        
+
         corruption_thread.start()
         checkpoint_thread.start()
-        
+
         corruption_thread.join(timeout=5)
         checkpoint_thread.join(timeout=5)
-        
+
         # At least one operation should complete (error handling should work)
         assert len(results) >= 1
-        
+
         # Database should still be functional after conflicts
         with self._get_test_conn() as conn:
             conn.execute("SELECT 1").fetchone()
-
-
-
