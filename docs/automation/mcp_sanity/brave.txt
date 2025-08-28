@@ -1,0 +1,33 @@
+MCP Brave Search Sanity Test Results
+====================================
+
+Test: Telegram Stars XTR createInvoiceLink SuccessfulPayment
+Timestamp: 2025-01-28 03:00:00 UTC
+
+Query: "Telegram Stars XTR createInvoiceLink SuccessfulPayment"
+Results Requested: 3
+Search Depth: 1
+
+Result: ERROR - Brave Search API error: 422
+Error Type: HTTP 422 Unprocessable Entity
+Status: FAILED
+
+Analysis:
+- Brave Search MCP server responded with 422 error
+- Indicates API request format or authentication issues
+- Could be due to missing API key or rate limiting
+- No search results retrieved
+
+Expected Output Format:
+Top 3 result titles/urls for Telegram Stars payment documentation
+- Title: [Payment method documentation]
+- URL: [Official documentation link]
+- Title: [API reference for Stars]
+- URL: [Telegram Bot API reference]
+- Title: [Implementation examples]
+- URL: [Developer guide or examples]
+
+MCP Brave Search Overall Status: NON-FUNCTIONAL
+- Success Rate: 0% (0/1 queries)
+- Error Code: 422 (API request issue)
+- Requires API configuration or authentication setup

@@ -1,0 +1,51 @@
+MCP Context7 Sanity Test Results
+=====================================
+
+Test 1: Telegram Bot API setWebhook secret_token header check
+Timestamp: 2025-01-28 02:59:00 UTC
+
+Query: "Telegram Bot API setWebhook secret_token header check"
+Library ID: /websites/core_telegram_bots_api
+Topic: setWebhook secret_token header check
+Tokens: 2000
+
+Result Summary:
+- Successfully retrieved comprehensive Telegram Bot API documentation
+- Found specific information about setWebhook method and secret_token parameter
+- Documentation includes detailed webhook configuration, security measures, and validation
+
+Key Findings:
+- setWebhook supports secret_token parameter (1-256 characters)
+- Secret token sent in header "X-Telegram-Bot-Api-Secret-Token" 
+- Only characters A-Z, a-z, 0-9, _ and - are allowed
+- Comprehensive webhook management methods available
+- Security enhancements for webhook validation included
+
+Documentation Coverage: EXCELLENT (25+ relevant code snippets returned)
+Response Time: ~2-3 seconds
+Quality Score: HIGH
+
+===============================================
+
+Test 2: SQLite WAL checkpoint TRUNCATE
+Timestamp: 2025-01-28 02:59:30 UTC
+
+Query: "SQLite WAL checkpoint TRUNCATE"
+Library ID: /websites/www_sqlite_org-docs.html
+Topic: WAL checkpoint TRUNCATE  
+Tokens: 2000
+
+Result: ERROR - fetch failed
+Error Type: TypeError: fetch failed
+Status: FAILED
+
+Analysis:
+- Context7 MCP shows intermittent connectivity issues
+- First query succeeded, second failed
+- Demonstrates partial functionality and error handling
+- Production deployment would need retry logic and fallback mechanisms
+
+MCP Context7 Overall Status: PARTIALLY FUNCTIONAL
+- Success Rate: 50% (1/2 queries)
+- Response Quality: HIGH (when successful)
+- Error Handling: Basic error reporting present
